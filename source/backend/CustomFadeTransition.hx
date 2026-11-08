@@ -186,7 +186,7 @@ class CustomFadeTransition extends MusicBeatSubstate
 		iconSprite.scale.set(0.5, 0.5);
 		iconSprite.screenCenter();
 
-		waterMark = new FlxText(0, height - 140, 300, 'Friday Night Funkin\':\nTheKhoaPC Engine', 32);
+		waterMark = new FlxText(0, height - 140, 300, 'FNF\': TheKhoaPC\nEngine', 32);
 		waterMark.x = (width - waterMark.width) / 2;
 		waterMark.setFormat(Paths.font('vcr.ttf'), 32, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 		waterMark.scrollFactor.set();
