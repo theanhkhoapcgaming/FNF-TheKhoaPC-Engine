@@ -1,0 +1,9 @@
+{
+  "elements": {
+    "menu_story_mode": { "x": 140, "y": 160 },
+    "menu_freeplay": { "x": 140, "y": 300 },
+    "menu_credits": { "alpha": 0.8 },
+    "background": { "color": "#223344" },
+    "options": { "x": 1180, "y": 620 }
+  }
+}

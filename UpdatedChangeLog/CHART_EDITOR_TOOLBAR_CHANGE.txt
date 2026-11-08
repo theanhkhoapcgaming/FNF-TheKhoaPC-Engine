@@ -1,0 +1,14 @@
+Chart Editor UI update
+=====================
+
+- File / Edit / View are now accessible from a fixed top toolbar styled after Character Editor.
+- Clicking a top toolbar button selects the matching existing PsychUIBox tab and opens its panel.
+- The Information box is now a fixed, compact horizontal panel at the bottom of the screen.
+- The Information panel no longer uses the previously saved floating position; it is anchored to the bottom edge.
+- Existing File/Edit/View tab contents and their actions are retained.
+
+Modified file:
+source/states/editors/ChartingState.hx
+
+Build verification:
+The ZIP archive is structurally validated. A Haxe build was not run in this environment.

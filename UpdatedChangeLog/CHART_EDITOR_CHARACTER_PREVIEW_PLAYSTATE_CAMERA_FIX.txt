@@ -1,0 +1,14 @@
+Chart Editor Character Preview - PlayState Camera Fix
+
+- Character JSON position[] is applied once to the preview character, matching PlayState.startCharacterPos().
+- Character JSON scale is preserved; preview no longer scales characters down to fit the window.
+- Preview camera scroll is calculated from Character.getMidpoint() and the same role-specific offsets used by PlayState.moveCamera():
+  - Opponent: midpoint.x + 150 + camera_position[0]
+  - BF: midpoint.x - 100 - camera_position[0]
+  - Both: midpoint.y - 100 + camera_position[1]
+- position[] is never reused as a camera offset.
+- Animation offsets are not injected into the camera target.
+- Camera viewport continues to follow its draggable preview window and is clipped to the window content area.
+
+Modified file: source/states/editors/ChartingState.hx
+Static verification: ZIP integrity checked. Haxe compilation/runtime testing not performed in this environment.

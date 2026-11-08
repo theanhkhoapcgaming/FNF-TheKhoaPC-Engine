@@ -1,0 +1,5 @@
+# Default mod enablement settings (applied only when a mod has no saved user preference).
+# User changes in the Mod State are stored in the user's data directory and override this file.
+# Format: ModFolder|1 (enabled by default) or ModFolder|0 (disabled by default)
+# Example:
+# ExampleMod|0

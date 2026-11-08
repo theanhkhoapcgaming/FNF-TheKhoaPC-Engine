@@ -1,0 +1,21 @@
+Chart Editor update - V-Slice-style Character Preview
+
+Modified:
+- source/states/editors/ChartingState.hx
+
+V-Slice reference findings:
+- V-Slice uses a CharacterPlayer HaxeUI component inside two draggable CollapsibleDialog toolboxes.
+- ChartEditorState forwards UPDATE, SONG_BEAT_HIT, SONG_STEP_HIT, and NOTE_HIT script events to the preview components.
+- The preview components load the current player/opponent character IDs and receive note-hit events to play animations.
+- CharacterPlayer is a V-Slice-specific component and is not present in this P-Slice source tree, so it cannot be copied as a drop-in class.
+
+P-Slice adaptation:
+- Keeps the existing PsychUIBox preview windows and Character sprites.
+- Drives singLEFT/DOWN/UP/RIGHT from the actual chart-note crossing event during playback instead of scanning the entire chart every frame.
+- Returns the preview character to its dance/idle animation after the sing animation finishes.
+- Refreshes the corresponding preview when player1 or player2 is changed in the chart editor.
+- Keeps the character positioned relative to its draggable PsychUIBox.
+
+Notes:
+- No chart data format changes.
+- ZIP integrity was checked. A Haxe build was not run in this environment, so compile/runtime validation remains necessary in the target P-Slice project.

@@ -1,0 +1,30 @@
+# Chart Editor Character Preview - Full Fix Notes
+
+## Reference architecture
+The Funkin 0.8.7 / V-Slice Chart Editor uses two independent preview toolboxes:
+- Player Preview (`charPlayer`, CharacterType.BF, flipped)
+- Opponent Preview (`charOpponent`, CharacterType.DAD, not flipped)
+
+Its `CharacterPlayer` wraps a `BaseCharacter` and receives update, beat, step, note-hit, note-miss, and related script events. The preview windows are separate draggable dialogs. The supplied P-Slice source uses PsychUIBox + Character + FlxCamera, so the V-Slice HaxeUI component is not a drop-in dependency.
+
+## P-Slice implementation
+- Keeps the native PsychUIBox windows and Character sprites.
+- Uses one transparent camera per preview, clipped to the content area below the title bar.
+- Renders preview cameras after `camUI`, so the character is not hidden behind the opaque toolbox background.
+- Keeps character coordinates local to the camera viewport; camera position alone places the viewport on screen.
+- Refreshes the relevant character when Player 1 / Player 2 is changed.
+- Plays singLEFT/DOWN/UP/RIGHT when playback crosses chart notes.
+- Restores idle/dance after a sing animation completes.
+- Adds independent beat tracking for Player and Opponent previews. P-Slice Character uses `dance()` and `danceEveryNumBeats` rather than V-Slice's `onBeatHit()` interface.
+- Updates previews after `MusicBeatState.update()` so the current `curBeat` is used.
+- Removes preview cameras when windows close and when ChartingState is destroyed.
+
+## Files changed
+- `source/states/editors/ChartingState.hx`
+
+## Dependencies/assets
+No new runtime dependency or external asset is needed. The V-Slice `CharacterPlayer` source depends on HaxeUI and `BaseCharacter`, neither of which is the native P-Slice Chart Editor architecture. The Funkin 0.8.7 source was used as a behavioral reference, not copied wholesale.
+
+## Validation
+- Source-level assertions and ZIP integrity checked.
+- Haxe compilation/runtime validation was not available in this environment. Build this in the target P-Slice project and test both preview windows, character swapping, playback, beat dancing, window dragging, and closing/reopening.
