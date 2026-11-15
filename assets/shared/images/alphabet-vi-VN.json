@@ -1,0 +1,355 @@
+{
+  "allowed": "aăâbcdđeêfghijklmnoôơpqrstuưvwxyzáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵñ0123456789!@#$%^&*()-_=+[]{}|;:',.<>?/\"❝❞•\\~¡¿",
+  "characters": {
+    "đ": {
+      "animation": "đ"
+    },
+    "&": {
+      "bold": [
+        0,
+        2
+      ]
+    },
+    "]": {
+      "bold": [
+        0,
+        -1
+      ]
+    },
+    "*": {
+      "normal": [
+        0,
+        28
+      ],
+      "bold": [
+        0,
+        40
+      ]
+    },
+    "+": {
+      "normal": [
+        0,
+        7
+      ],
+      "bold": [
+        0,
+        12
+      ]
+    },
+    "-": {
+      "normal": [
+        0,
+        16
+      ],
+      "bold": [
+        0,
+        16
+      ]
+    },
+    "<": {
+      "bold": [
+        0,
+        -2
+      ]
+    },
+    ">": {
+      "bold": [
+        0,
+        -2
+      ]
+    },
+    "'": {
+      "animation": "apostrophe",
+      "normal": [
+        0,
+        32
+      ],
+      "bold": [
+        0,
+        40
+      ]
+    },
+    "\"": {
+      "animation": "quote",
+      "normal": [
+        0,
+        32
+      ],
+      "bold": [
+        0,
+        40
+      ]
+    },
+    "!": {
+      "animation": "exclamation"
+    },
+    "?": {
+      "animation": "question"
+    },
+    ".": {
+      "animation": "period"
+    },
+    "❝": {
+      "animation": "start quote",
+      "normal": [
+        0,
+        24
+      ],
+      "bold": [
+        0,
+        40
+      ]
+    },
+    "❞": {
+      "animation": "end quote",
+      "normal": [
+        0,
+        24
+      ],
+      "bold": [
+        0,
+        40
+      ]
+    },
+    ":": {
+      "normal": [
+        0,
+        2
+      ],
+      "bold": [
+        0,
+        8
+      ]
+    },
+    ";": {
+      "normal": [
+        0,
+        -2
+      ],
+      "bold": [
+        0,
+        4
+      ]
+    },
+    "^": {
+      "normal": [
+        0,
+        28
+      ],
+      "bold": [
+        0,
+        38
+      ]
+    },
+    ",": {
+      "animation": "comma",
+      "normal": [
+        0,
+        -6
+      ],
+      "bold": [
+        0,
+        -4
+      ]
+    },
+    "\\": {
+      "animation": "back slash"
+    },
+    "/": {
+      "animation": "forward slash"
+    },
+    "~": {
+      "normal": [
+        0,
+        16
+      ],
+      "bold": [
+        0,
+        20
+      ]
+    },
+    "¡": {
+      "animation": "¡",
+      "normal": [
+        0,
+        -20
+      ],
+      "bold": [
+        0,
+        -20
+      ]
+    },
+    "¿": {
+      "animation": "¿",
+      "normal": [
+        0,
+        -20
+      ],
+      "bold": [
+        0,
+        -20
+      ]
+    },
+    "•": {
+      "animation": "•",
+      "normal": [
+        0,
+        18
+      ],
+      "bold": [
+        0,
+        20
+      ]
+    },
+    "ă": {
+      "animation": "ă"
+    },
+    "ĩ": {
+      "animation": "ĩ"
+    },
+    "ũ": {
+      "animation": "ũ"
+    },
+    "ơ": {
+      "animation": "ơ"
+    },
+    "ư": {
+      "animation": "ư"
+    },
+    "ạ": {
+      "animation": "ạ"
+    },
+    "ả": {
+      "animation": "ả"
+    },
+    "ấ": {
+      "animation": "ấ"
+    },
+    "ầ": {
+      "animation": "ầ"
+    },
+    "ẩ": {
+      "animation": "ẩ"
+    },
+    "ẫ": {
+      "animation": "ẫ"
+    },
+    "ậ": {
+      "animation": "ậ"
+    },
+    "ắ": {
+      "animation": "ắ"
+    },
+    "ằ": {
+      "animation": "ằ"
+    },
+    "ẳ": {
+      "animation": "ẳ"
+    },
+    "ẵ": {
+      "animation": "ẵ"
+    },
+    "ặ": {
+      "animation": "ặ"
+    },
+    "ẹ": {
+      "animation": "ẹ"
+    },
+    "ẻ": {
+      "animation": "ẻ"
+    },
+    "ẽ": {
+      "animation": "ẽ"
+    },
+    "ế": {
+      "animation": "ế"
+    },
+    "ề": {
+      "animation": "ề"
+    },
+    "ể": {
+      "animation": "ể"
+    },
+    "ễ": {
+      "animation": "ễ"
+    },
+    "ệ": {
+      "animation": "ệ"
+    },
+    "ỉ": {
+      "animation": "ỉ"
+    },
+    "ị": {
+      "animation": "ị"
+    },
+    "ọ": {
+      "animation": "ọ"
+    },
+    "ỏ": {
+      "animation": "ỏ"
+    },
+    "ố": {
+      "animation": "ố"
+    },
+    "ồ": {
+      "animation": "ồ"
+    },
+    "ổ": {
+      "animation": "ổ"
+    },
+    "ỗ": {
+      "animation": "ỗ"
+    },
+    "ộ": {
+      "animation": "ộ"
+    },
+    "ớ": {
+      "animation": "ớ"
+    },
+    "ờ": {
+      "animation": "ờ"
+    },
+    "ở": {
+      "animation": "ở"
+    },
+    "ỡ": {
+      "animation": "ỡ"
+    },
+    "ợ": {
+      "animation": "ợ"
+    },
+    "ụ": {
+      "animation": "ụ"
+    },
+    "ủ": {
+      "animation": "ủ"
+    },
+    "ứ": {
+      "animation": "ứ"
+    },
+    "ừ": {
+      "animation": "ừ"
+    },
+    "ử": {
+      "animation": "ử"
+    },
+    "ữ": {
+      "animation": "ữ"
+    },
+    "ự": {
+      "animation": "ự"
+    },
+    "ỳ": {
+      "animation": "ỳ"
+    },
+    "ỵ": {
+      "animation": "ỵ"
+    },
+    "ỷ": {
+      "animation": "ỷ"
+    },
+    "ỹ": {
+      "animation": "ỹ"
+    }
+  }
+}
