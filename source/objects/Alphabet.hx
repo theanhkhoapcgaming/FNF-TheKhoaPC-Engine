@@ -289,11 +289,52 @@ class AlphaCharacter extends FlxSprite
 	public var image(default, set):String;
 
 	public static var allLetters:Map<String, Null<Letter>>;
+	/**
+	 * Atlas currently used by every AlphaCharacter.
+	 * Kept in sync with the JSON data selected by loadAlphabetData().
+	 */
+	public static var alphabetImage:String = 'alphabet';
+
+	private static function alphabetFilesExist(name:String):Bool
+	{
+		return NativeFileSystem.exists(Paths.getPath('images/$name.png'))
+			&& NativeFileSystem.exists(Paths.getPath('images/$name.xml'));
+	}
 
 	public static function loadAlphabetData(request:String = 'alphabet')
 	{
-		var path:String = Paths.getPath('images/$request.json');
-		if(!NativeFileSystem.exists(path))
+		// A language can provide a complete, independent atlas:
+		// alphabet-vi-VN.png / alphabet-vi-VN.xml / alphabet-vi-VN.json.
+		// The PNG/XML pair is required; its JSON is optional and falls back to alphabet.json.
+		var requested:String = request;
+		if (requested == null || requested.length == 0) requested = 'alphabet';
+		requested = requested.replace('\\\\', '/');
+		if (requested.startsWith('images/')) requested = requested.substr('images/'.length);
+		if (requested.endsWith('.json')) requested = requested.substr(0, requested.length - 5);
+
+		var selected:String = null;
+		if (requested != 'alphabet' && alphabetFilesExist(requested))
+			selected = requested;
+
+		if (selected == null)
+		{
+			var language:String = ClientPrefs.data.language;
+			if (language != null && language.length > 0)
+			{
+				var localized:String = 'alphabet-' + language;
+				if (alphabetFilesExist(localized))
+					selected = localized;
+			}
+		}
+
+		if (selected == null && alphabetFilesExist(requested))
+			selected = requested;
+		if (selected == null)
+			selected = 'alphabet';
+
+		alphabetImage = selected;
+		var path:String = Paths.getPath('images/$selected.json');
+		if (!NativeFileSystem.exists(path))
 			path = Paths.getPath('images/alphabet.json');
 
 		allLetters = new Map<String, Null<Letter>>();
@@ -345,7 +386,7 @@ class AlphaCharacter extends FlxSprite
 	public function new()
 	{
 		super(x, y);
-		image = 'alphabet';
+		image = alphabetImage;
 		antialiasing = ClientPrefs.data.antialiasing;
 
 		moves = false;
