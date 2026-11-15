@@ -20,6 +20,7 @@ import flixel.tweens.FlxTween;
 import flixel.util.FlxTimer;
 import mikolka.funkin.FunkinSound;
 import mikolka.funkin.players.PlayerRegistry;
+import mikolka.funkin.custom.NativeFileSystem;
 import mikolka.funkin.FlxAtlasSprite;
 import openfl.filters.DropShadowFilter;
 import mikolka.compatibility.funkin.FunkinCamera;
@@ -102,6 +103,34 @@ class CharSelectSubState extends MusicBeatSubState
 			curChar = charData.char_name;
 		}
 		loadAvailableCharacters();
+
+		// A previously selected character may no longer have its Character Select
+		// atlas installed (for example, Pico without picoChill). Do not try to
+		// initialize that missing preview; return to the default character.
+		if (curChar != Constants.DEFAULT_CHARACTER && !isCharacterAvailable(curChar))
+			@:bypassAccessor curChar = Constants.DEFAULT_CHARACTER;
+	}
+
+	/**
+	 * Checks the same three files required by Paths.loadAnimateAtlas().
+	 * This keeps characters without a complete Chill atlas out of the selector,
+	 * matching V-Slice's atlas-loading requirements instead of letting them crash
+	 * later when CharSelectPlayer.switchChar() tries to play an animation.
+	 */
+	function hasCharSelectAtlas(playerId:String):Bool
+	{
+		var atlasPath:String = 'images/charSelect/${playerId}Chill';
+		return NativeFileSystem.exists(Paths.getPath('$atlasPath/spritemap1.png'))
+			&& NativeFileSystem.exists(Paths.getPath('$atlasPath/spritemap1.json'))
+			&& NativeFileSystem.exists(Paths.getPath('$atlasPath/Animation.json'));
+	}
+
+	function isCharacterAvailable(playerId:String):Bool
+	{
+		for (availableId in availableChars)
+			if (availableId == playerId)
+				return true;
+		return false;
 	}
 
 	function loadAvailableCharacters():Void
@@ -116,6 +145,14 @@ class CharSelectSubState extends MusicBeatSubState
 			var playerData = player.getCharSelectData();
 			if (playerData == null)
 				continue;
+
+			// V-Slice only has a usable Character Select preview when the Chill
+			// atlas exists. Skip entries such as Pico when picoChill is missing.
+			if (!hasCharSelectAtlas(playerId))
+			{
+				trace('Skipping Character Select entry "${playerId}": missing charSelect/${playerId}Chill atlas.');
+				continue;
+			}
 
 			var targetPosition:Int = playerData.position ?? 0;
 			while (availableChars.exists(targetPosition))

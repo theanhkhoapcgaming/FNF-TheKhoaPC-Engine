@@ -86,10 +86,27 @@ class FlxAtlasSprite extends PsychFlxAnimate
       Paths.loadAnimateAtlas(this,path,null,ANIMATION_OBJECTS.get(path));
   }
   /**
+   * Whether this sprite has a successfully loaded Animate atlas.
+   * loadAtlas() may fail without throwing when atlas files are missing.
+   */
+  public function hasValidAtlas():Bool
+  {
+    return this.anim != null && this.anim.stageInstance != null && this.anim.symbolDictionary != null
+      && this.anim.stageInstance.symbol != null;
+  }
+
+  /**
    * @return A list of all the animations this sprite has available.
    */
   public function listAnimations():Array<String>
   {
+    // loadAtlas() can fail without throwing when either spritemap1.json or
+    // Animation.json is missing. In that case FlxAnimate still exists, but
+    // stageInstance is null. Do not dereference it while querying animations.
+    if (this.anim == null || this.anim.stageInstance == null || this.anim.symbolDictionary == null
+      || this.anim.stageInstance.symbol == null)
+      return [];
+
     var mainSymbol = this.anim.symbolDictionary[this.anim.stageInstance.symbol.name];
     if (mainSymbol == null)
     {
@@ -105,6 +122,9 @@ class FlxAtlasSprite extends PsychFlxAnimate
    */
   public function hasAnimation(id:String):Bool
   {
+    if (id == null || this.anim == null || this.anim.stageInstance == null || this.anim.symbolDictionary == null)
+      return false;
+
     return getLabelIndex(id) != -1 || anim.symbolDictionary.exists(id);
   }
 
@@ -156,7 +176,15 @@ class FlxAtlasSprite extends PsychFlxAnimate
         return;
     }
 
-    if (anim == null) return;
+    // A failed atlas load leaves an FlxAnimate instance without a stage.
+    // Treat it as an unavailable animation instead of crashing in
+    // hasAnimation()/listAnimations(). This commonly happens for modded
+    // characters that do not provide a charSelect/<character>Chill atlas.
+    if (anim == null || anim.stageInstance == null || anim.symbolDictionary == null)
+    {
+      trace('Cannot play animation "' + id + '": FlxAtlasSprite has no valid atlas.');
+      return;
+    }
 
     if (id == null || id == '') id = this.currentAnimation;
 

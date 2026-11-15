@@ -60,9 +60,6 @@ class InitState extends MusicBeatState
 			NativeFileSystem.openFlAssets = Assets.list();
 		}
 
-		// Detect SCM version before the intro/title is created.
-		trace("Loading SCM version");
-		MainMenuState.loadSCMVersion();
 
 		trace("Loading game settings");
 		ClientPrefs.loadPrefs();
