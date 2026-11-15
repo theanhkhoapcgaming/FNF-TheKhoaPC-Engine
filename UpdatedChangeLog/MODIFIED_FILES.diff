@@ -1,0 +1,110 @@
+--- OutSource/source/objects/VideoSprite.hx
++++ ULTIMATESOURCE/source/objects/VideoSprite.hx
+@@ -30,13 +30,15 @@
+ 	public var didPlay:Bool = false;
+ 
+ 	var pauseJustClosed:Bool = false;
++	public var legacyMode(default, null):Bool = false;
+ 
+ 	private var doWeLoop:Bool = false; // for hxCodec
+ 
+-	public function new(videoName:String, isWaiting:Bool, canSkip:Bool = false, shouldLoop:Dynamic = false) {
++	public function new(videoName:String, isWaiting:Bool, canSkip:Bool = false, shouldLoop:Dynamic = false, legacyMode:Bool = false) {
+ 		super();
+ 
+ 		this.doWeLoop = shouldLoop;
++		this.legacyMode = legacyMode;
+ 		this.videoName = videoName;
+ 		scrollFactor.set();
+ 		cameras = [FlxG.cameras.list[FlxG.cameras.list.length - 1]];
+@@ -118,7 +120,7 @@
+ 
+ 	override function update(elapsed:Float)
+ 	{
+-		if (Controls.instance.pressed('pause') #if android || FlxG.android.justReleased.BACK #end && !pauseJustClosed && PlayState.instance != null )
++		if (!legacyMode && Controls.instance.pressed('pause') #if android || FlxG.android.justReleased.BACK #end && !pauseJustClosed && PlayState.instance != null )
+ 			{
+ 				var game = PlayState.instance;
+ 					FlxG.camera.followLerp = 0;
+--- OutSource/source/psychlua/FunkinLua.hx
++++ ULTIMATESOURCE/source/psychlua/FunkinLua.hx
+@@ -1348,6 +1348,37 @@
+ 			#end
+ 		});
+ 
++Lua_helper.add_callback(lua, "playLegacyVideo", function(videoFile:String, ?forMidSong:Bool = false, ?canSkip:Bool = true, ?shouldLoop:Bool = false, ?playOnLoad:Bool = true) {
++    #if VIDEOS_ALLOWED
++    if (NativeFileSystem.exists(Paths.video(videoFile)))
++    {
++        if (game.videoCutscene != null)
++        {
++            game.remove(game.videoCutscene);
++            game.videoCutscene.destroy();
++        }
++
++        game.videoCutscene = game.playLegacyVideo(
++            videoFile,
++            forMidSong,
++            canSkip,
++            shouldLoop,
++            playOnLoad
++        );
++
++        return game.videoCutscene != null;
++    }
++    else
++    {
++        luaTrace('playLegacyVideo: Video file not found: ' + videoFile, false, false, FlxColor.RED);
++    }
++    return false;
++    #else
++    return false;
++    #end
++});
++
++
+ 		Lua_helper.add_callback(lua, "playMusic", function(sound:String, ?volume:Float = 1, ?loop:Bool = false) {
+ 			FlxG.sound.playMusic(Paths.music(sound), volume, loop);
+ 		});
+--- OutSource/source/states/PlayState.hx
++++ ULTIMATESOURCE/source/states/PlayState.hx
+@@ -956,7 +956,7 @@
+ 
+ 	public var videoCutscene:VideoSprite = null;
+ 
+-	public function startVideo(name:String, forMidSong:Bool = false, canSkip:Bool = true, loop:Bool = false, playOnLoad:Bool = true)
++	public function startVideo(name:String, forMidSong:Bool = false, canSkip:Bool = true, loop:Bool = false, playOnLoad:Bool = true, legacyMode:Bool = false)
+ 	{
+ 		#if VIDEOS_ALLOWED
+ 		inCutscene = !forMidSong;
+@@ -974,7 +974,7 @@
+ 
+ 		if (foundFile)
+ 		{
+-			videoCutscene = new VideoSprite(fileName, forMidSong, canSkip, loop);
++			videoCutscene = new VideoSprite(fileName, forMidSong, canSkip, loop, legacyMode);
+ 			if (forMidSong)
+ 				videoCutscene.setSpeed(playbackRate);
+ 
+@@ -1021,6 +1021,15 @@
+ 		startAndEnd();
+ 		#end
+ 		return null;
++	}
++
++	/**
++	 * Plays a video without opening the dedicated Video Pause SubState.
++	 * Legacy videos keep playing when the normal pause key is pressed.
++	 */
++	public function playLegacyVideo(name:String, forMidSong:Bool = false, canSkip:Bool = true, loop:Bool = false, playOnLoad:Bool = true):VideoSprite
++	{
++		return startVideo(name, forMidSong, canSkip, loop, playOnLoad, true);
+ 	}
+ 
+ 	function startAndEnd()
+@@ -4652,4 +4661,4 @@
+ 	return false;
+ }
+ #end
+-}
++}

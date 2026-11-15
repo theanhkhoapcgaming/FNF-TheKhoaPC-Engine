@@ -1,0 +1,32 @@
+ULTIMATESOURCE -> OutSource patch
+Purpose: files added or modified in ULTIMATESOURCE compared with OutSource.
+
+INSTALL:
+1. Back up the target global engine source tree.
+2. Copy the contents of this package's 'source/' directory into the matching 'source/' directory of the global engine.
+3. Allow files to overwrite when prompted (the 3 modified files must replace their OutSource versions).
+4. The 9 added files should retain the exact relative paths shown below.
+
+SUMMARY:
+Added: 9
+Modified: 3
+Deleted: 0
+
+ADDED FILES:
+  + source/backend/VideoSpriteManager.hx
+  + source/objects/Psych073VideoPlayer.hx
+  + source/objects/hxcodec/v2_5_0/MP4Handler.hx
+  + source/objects/hxcodec/v2_5_0/MP4Sprite.hx
+  + source/objects/hxcodec/v2_6_0/VideoHandler.hx
+  + source/objects/hxcodec/v2_6_0/VideoSprite.hx
+  + source/objects/hxcodec/v3_0_0/FlxVideo.hx
+  + source/objects/hxcodec/v3_0_0/FlxVideoSprite.hx
+  + source/objects/hxcodec/v3_0_0/Video.hx
+
+MODIFIED FILES:
+  * source/objects/VideoSprite.hx
+  * source/psychlua/FunkinLua.hx
+  * source/states/PlayState.hx
+
+DELETED FILES:
+  (none)

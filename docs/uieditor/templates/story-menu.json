@@ -1,0 +1,17 @@
+{
+  "scrollDirection": "vertical",
+  "elements": {
+    "background": { "alpha": 1.0 },
+    "headerBar": { "alpha": 0.9 },
+    "weekAccent": { "color": "#F9CF51" },
+    "score": { "x": 10, "y": 10, "textSize": 32 },
+    "weekTitle": { "x": 900, "y": 10 },
+    "tracklist": { "x": 64, "y": 480 },
+    "tracksImage": { "alpha": 0.9 },
+    "leftDifficultyArrow": { "alpha": 1.0 },
+    "rightDifficultyArrow": { "alpha": 1.0 },
+    "difficulty": { "alpha": 1.0 },
+    "week_0": { "x": 40 },
+    "character_0": { "scaleX": 1.0, "scaleY": 1.0 }
+  }
+}

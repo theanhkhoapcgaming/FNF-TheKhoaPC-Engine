@@ -1,0 +1,9 @@
+{
+  "elements": {
+    "background": { "color": "#222244" },
+    "description": { "textSize": 32 },
+    "descriptionBox": { "alpha": 0.6 },
+    "entry_0": { "alpha": 1.0 },
+    "icon_0": { "alpha": 1.0 }
+  }
+}

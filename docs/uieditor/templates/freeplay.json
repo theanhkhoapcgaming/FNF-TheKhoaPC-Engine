@@ -1,0 +1,22 @@
+{
+  "scrollDirection": "vertical",
+  "elements": {
+    "dj": { "scaleX": 1.0, "scaleY": 1.0 },
+    "characterHint": { "alpha": 0.8 },
+    "topLeftTitle": { "x": 24, "y": 8 },
+    "titleBackground": { "alpha": 0.8 },
+    "songTitle": { "alpha": 1.0 },
+    "highscoreIcon": { "alpha": 1.0 },
+    "clearBox": { "alpha": 1.0 },
+    "completionText": { "alpha": 1.0 },
+    "score": { "alpha": 1.0 },
+    "letterSort": { "alpha": 1.0 },
+    "overhang": { "alpha": 1.0 },
+    "albumRoll": { "alpha": 1.0 },
+    "difficultyLeft": { "visible": true },
+    "difficultyRight": { "visible": true },
+    "backingImage": { "alpha": 1.0 },
+    "rankBackground": { "alpha": 1.0 },
+    "capsule_0": { "alpha": 1.0 }
+  }
+}

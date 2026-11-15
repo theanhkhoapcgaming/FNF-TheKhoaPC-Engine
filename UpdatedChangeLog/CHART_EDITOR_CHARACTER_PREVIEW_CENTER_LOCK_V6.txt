@@ -1,0 +1,11 @@
+Chart Editor Character Preview - Center Lock v6
+
+- Character preview sprites use scrollFactor (1, 1).
+- The preview camera scroll is recalculated after super.update() every frame.
+- The camera target is the center of the rendered sprite bounds, adjusted for
+  the current animation offset, and is placed at the center of the preview area.
+- Character world position is held at (0, 0); the camera performs the centering.
+- This avoids mixing viewport-local sprite positioning with camera scrolling.
+
+This patch has ZIP integrity validation only. It has not been Haxe-compiled or
+runtime-tested; verify camera scroll sign/offset behavior in the target Flixel build.

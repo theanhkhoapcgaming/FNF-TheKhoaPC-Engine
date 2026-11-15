@@ -1,0 +1,11 @@
+Chart Editor toolbar / character preview rework
+
+- Centered the File, Edit, View, Window and Help toolbar buttons as one group.
+- Kept the existing toolbar button dimensions and the existing tab-menu contents/dimensions.
+- Replaced the separate floating character preview groups with draggable PsychUIBox windows.
+- Each character is positioned from its owning PsychUIBox coordinates after PsychUIBox drag updates,
+  so the preview follows the box instead of remaining at its old screen position.
+- BF and Dad preview windows remain independently toggleable from Window > Show BF Character / Show Dad Character.
+- Chart note animation preview logic and chart data are otherwise unchanged.
+
+Build status: ZIP integrity checked. Haxe compilation was not available in the packaging environment.
