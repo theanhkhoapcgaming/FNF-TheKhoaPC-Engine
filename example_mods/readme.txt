@@ -1,2 +1,1 @@
-PLEASE PUT THE FOLDER KhoaPC's Chart Mod (1.0+) IN THE GAME PLEASE!!!!!!!!!
-also this compatible with Other Psych Engine Mod!
+Put the Psych Engine/P-Slice Engine/TheKhoaPC Engine Compatible mods here!
