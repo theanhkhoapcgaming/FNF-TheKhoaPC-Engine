@@ -1,0 +1,5 @@
+Story
+"Press enter here 10 times to enable the Development Mode!"
+
+Characters
+Boyfriend::bf::A Guy who wanted Girlfriend so badly that he dare to rap battle with her parents :)::bf::0xFF222222::false
