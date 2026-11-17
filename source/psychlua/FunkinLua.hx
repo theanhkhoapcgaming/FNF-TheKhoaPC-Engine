@@ -1316,6 +1316,17 @@ class FunkinLua {
 			}
 			return false;
 		});
+		Lua_helper.add_callback(lua, "precacheVideo", function(videoFile:String) {
+			#if VIDEOS_ALLOWED
+			if (game != null && game.precacheVideo(videoFile))
+				return true;
+			luaTrace('precacheVideo: Video file not found or could not be prepared: ' + videoFile, false, false, FlxColor.RED);
+			return false;
+			#else
+			return false;
+			#end
+		});
+
 		Lua_helper.add_callback(lua, "startVideo", function(videoFile:String, ?canSkip:Bool = true, ?forMidSong:Bool = false, ?shouldLoop:Bool = false, ?playOnLoad:Bool = true) {
 			#if VIDEOS_ALLOWED
 			if(NativeFileSystem.exists(Paths.video(videoFile)))
