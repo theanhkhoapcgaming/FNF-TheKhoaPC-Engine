@@ -956,6 +956,27 @@ class PlayState extends MusicBeatState
 
 	public var videoCutscene:VideoSprite = null;
 
+	/** Prepares a video ahead of playback so the same VLC player can be reused. */
+	public function precacheVideo(name:String):Bool
+	{
+		#if VIDEOS_ALLOWED
+		if (name == null || name.trim().length == 0)
+			return false;
+
+		var fileName:String = Paths.video(name);
+		#if sys
+		if (!NativeFileSystem.exists(fileName))
+			return false;
+		#else
+		if (!Assets.exists(fileName))
+			return false;
+		#end
+		return VideoSprite.precacheVideo(fileName);
+		#else
+		return false;
+		#end
+	}
+
 	public function startVideo(name:String, forMidSong:Bool = false, canSkip:Bool = true, loop:Bool = false, playOnLoad:Bool = true, legacyMode:Bool = false)
 	{
 		#if VIDEOS_ALLOWED
@@ -974,7 +995,11 @@ class PlayState extends MusicBeatState
 
 		if (foundFile)
 		{
-			videoCutscene = new VideoSprite(fileName, forMidSong, canSkip, loop, legacyMode);
+			// Reuse the exact VLC instance prepared by precacheVideo(). If no
+			// compatible cached player exists, fall back to normal construction.
+			videoCutscene = VideoSprite.takePrecachedVideo(fileName, forMidSong, canSkip, loop, legacyMode);
+			if (videoCutscene == null)
+				videoCutscene = new VideoSprite(fileName, forMidSong, canSkip, loop, legacyMode);
 			if (forMidSong)
 				videoCutscene.setSpeed(playbackRate);
 
