@@ -1731,22 +1731,37 @@ class PlayState extends MusicBeatState
 		switch (event.event)
 		{
 			case "Change Character":
-				var charType:Int = 0;
-				switch (event.value1.toLowerCase())
-				{
-					case 'gf' | 'girlfriend' | '1':
-						charType = 2;
-					case 'dad' | 'opponent' | '0':
-						charType = 1;
-					default:
-						var val1:Int = Std.parseInt(event.value1);
-						if (Math.isNaN(val1))
-							val1 = 0;
-						charType = val1;
-				}
+				var targetName:String = event.value1 == null ? '' : event.value1.trim();
+				var targetLower:String = targetName.toLowerCase();
+				var isDefaultTarget:Bool = ['bf', 'boyfriend', 'dad', 'opponent', 'gf', 'girlfriend', '0', '1', '2'].contains(targetLower);
 
-				var newCharacter:String = event.value2;
-				addCharacterToList(newCharacter, charType);
+				if (!isDefaultTarget)
+				{
+					// Preload custom Stage Editor characters without registering them as BF/Dad/GF.
+					var stageObject:Dynamic = variables.get(targetName);
+					if (Std.isOfType(stageObject, Character))
+					{
+						var stageCharacter:Character = cast stageObject;
+						try
+						{
+							var preloadCharacter:Character = new Character(0, 0, event.value2, stageCharacter.isPlayer);
+							preloadCharacter.destroy();
+						}
+						catch (e:Dynamic)
+							trace('[Change Character] Preload failed for "' + event.value2 + '": ' + e);
+					}
+				}
+				else
+				{
+					var charType:Int = 0;
+					switch (targetLower)
+					{
+						case 'gf' | 'girlfriend' | '2': charType = 2;
+						case 'dad' | 'opponent' | '1': charType = 1;
+						default: charType = 0;
+					}
+					addCharacterToList(event.value2, charType);
+				}
 
 			case 'Play Sound':
 				Paths.sound(event.value1); // Precache sound
@@ -2641,86 +2656,98 @@ public function triggerEvent(eventName:String, value1:String, value2:String, str
 			}
 
 		case 'Change Character':
-			var charType:Int = 0;
-			switch (value1.toLowerCase().trim())
+			var targetName:String = value1 == null ? '' : value1.trim();
+			var targetLower:String = targetName.toLowerCase();
+			var isDefaultTarget:Bool = ['bf', 'boyfriend', 'dad', 'opponent', 'gf', 'girlfriend', '0', '1', '2'].contains(targetLower);
+
+			if (!isDefaultTarget)
 			{
-				case 'gf' | 'girlfriend':
-					charType = 2;
-				case 'dad' | 'opponent':
-					charType = 1;
-				default:
-					charType = Std.parseInt(value1);
-					if (Math.isNaN(charType)) charType = 0;
-			}
+				// Value 1 is the Stage Editor element's Name (Lua/HScript ID).
+				var stageObject:Dynamic = variables.get(targetName);
+				if (Std.isOfType(stageObject, Character))
+				{
+					var stageCharacter:Character = cast stageObject;
+					if (stageCharacter.curCharacter != value2)
+					{
+						try
+						{
+							// Mirror the built-in Change Character flow: preserve the base
+							// stage position, then apply the NEW character's positionArray.
+							var baseX:Float = stageCharacter.x - stageCharacter.positionArray[0];
+							var baseY:Float = stageCharacter.y - stageCharacter.positionArray[1];
 
-			switch (charType)
+							stageCharacter.changeCharacter(value2);
+
+							stageCharacter.x = baseX + stageCharacter.positionArray[0];
+							stageCharacter.y = baseY + stageCharacter.positionArray[1];
+							startCharacterScripts(stageCharacter.curCharacter);
+						}
+						catch (e:Dynamic)
+							trace('[Change Character] Could not change stage element "' + targetName + '": ' + e);
+					}
+				}
+				else
+					trace('[Change Character] Stage Character element not found: ' + targetName);
+			}
+			else
 			{
-				case 0:
-					if (boyfriend.curCharacter != value2)
-					{
-						if (!boyfriendMap.exists(value2))
+				var charType:Int = 0;
+				switch (targetLower)
+				{
+					case 'gf' | 'girlfriend' | '2': charType = 2;
+					case 'dad' | 'opponent' | '1': charType = 1;
+					default: charType = 0;
+				}
+
+				switch (charType)
+				{
+					case 0:
+						if (boyfriend.curCharacter != value2)
 						{
-							addCharacterToList(value2, charType);
+							if (!boyfriendMap.exists(value2)) addCharacterToList(value2, charType);
+							var lastAlpha:Float = boyfriend.alpha;
+							boyfriend.shader = null;
+							boyfriend.alpha = 0.00001;
+							boyfriend = boyfriendMap.get(value2);
+							boyfriend.alpha = lastAlpha;
+							iconP1.changeIcon(boyfriend.healthIcon);
 						}
-
-						var lastAlpha:Float = boyfriend.alpha;
-						boyfriend.shader = null; // ? remove the shader
-						boyfriend.alpha = 0.00001;
-						boyfriend = boyfriendMap.get(value2);
-						boyfriend.alpha = lastAlpha;
-						iconP1.changeIcon(boyfriend.healthIcon);
-					}
-					setOnScripts('boyfriendName', boyfriend.curCharacter);
-
-				case 1:
-					if (dad.curCharacter != value2)
-					{
-						if (!dadMap.exists(value2))
+						setOnScripts('boyfriendName', boyfriend.curCharacter);
+					case 1:
+						if (dad.curCharacter != value2)
 						{
-							addCharacterToList(value2, charType);
-						}
-
-						var wasGf:Bool = dad.curCharacter.startsWith('gf-') || dad.curCharacter == 'gf';
-						var lastAlpha:Float = dad.alpha;
-						dad.shader = null; // ? remove the shader
-						dad.alpha = 0.00001;
-						dad = dadMap.get(value2);
-						if (!dad.curCharacter.startsWith('gf-') && dad.curCharacter != 'gf')
-						{
-							if (wasGf && gf != null)
+							if (!dadMap.exists(value2)) addCharacterToList(value2, charType);
+							var wasGf:Bool = dad.curCharacter.startsWith('gf-') || dad.curCharacter == 'gf';
+							var lastAlpha:Float = dad.alpha;
+							dad.shader = null;
+							dad.alpha = 0.00001;
+							dad = dadMap.get(value2);
+							if (!dad.curCharacter.startsWith('gf-') && dad.curCharacter != 'gf')
 							{
-								gf.visible = true;
+								if (wasGf && gf != null) gf.visible = true;
 							}
+							else if (gf != null) gf.visible = false;
+							dad.alpha = lastAlpha;
+							iconP2.changeIcon(dad.healthIcon);
 						}
-						else if (gf != null)
+						setOnScripts('dadName', dad.curCharacter);
+					case 2:
+						if (gf != null)
 						{
-							gf.visible = false;
-						}
-						dad.alpha = lastAlpha;
-						iconP2.changeIcon(dad.healthIcon);
-					}
-					setOnScripts('dadName', dad.curCharacter);
-
-				case 2:
-					if (gf != null)
-					{
-						if (gf.curCharacter != value2)
-						{
-							if (!gfMap.exists(value2))
+							if (gf.curCharacter != value2)
 							{
-								addCharacterToList(value2, charType);
+								if (!gfMap.exists(value2)) addCharacterToList(value2, charType);
+								var lastAlpha:Float = gf.alpha;
+								gf.shader = null;
+								gf.alpha = 0.00001;
+								gf = gfMap.get(value2);
+								gf.alpha = lastAlpha;
 							}
-
-							var lastAlpha:Float = gf.alpha;
-							gf.shader = null; // ? remove the shader
-							gf.alpha = 0.00001;
-							gf = gfMap.get(value2);
-							gf.alpha = lastAlpha;
+							setOnScripts('gfName', gf.curCharacter);
 						}
-						setOnScripts('gfName', gf.curCharacter);
-					}
+				}
+				reloadHealthBarColors();
 			}
-			reloadHealthBarColors();
 
 		case 'Change Scroll Speed':
 			if (songSpeedType != "constant")
@@ -3765,6 +3792,67 @@ function noteMissCommon(direction:Int, note:Note = null)
 	vocals.volume = 0;
 }
 
+// Route explicitly assigned custom Note Types to Stage Editor Character Elements.
+// This is independent from note.noAnimation: that flag controls the default
+// BF/Dad/GF animation, while Stage Characters use their own noteTypes lists.
+function playStageEditorCharacterNote(note:Note):Bool
+{
+	if (note == null || note.noteType == null || note.noteType.length == 0)
+		return false;
+
+	// Stage Characters are added directly to the PlayState by StageData. Do not
+	// rely only on the Lua/HScript `variables` map: unnamed elements (or elements
+	// whose script tag was not registered) are still valid Stage Characters and
+	// must receive their assigned Note Types.
+	var stageCharacters:Array<Character> = [];
+	for (member in members)
+	{
+		if (Std.isOfType(member, Character))
+		{
+			var candidate:Character = cast member;
+			if (candidate.stageEditorNoteTypes != null && candidate.stageEditorNoteTypes.length > 0
+				&& !stageCharacters.contains(candidate))
+				stageCharacters.push(candidate);
+		}
+	}
+
+	// Keep compatibility with characters exposed through variables (including
+	// any custom stage/script setup that inserts them there instead of as a direct
+	// PlayState member).
+	for (tag in variables.keys())
+	{
+		var value:Dynamic = variables.get(tag);
+		if (!Std.isOfType(value, Character)) continue;
+		var candidate:Character = cast value;
+		if (candidate.stageEditorNoteTypes != null && candidate.stageEditorNoteTypes.length > 0
+			&& !stageCharacters.contains(candidate))
+			stageCharacters.push(candidate);
+	}
+
+	var handled:Bool = false;
+	var direction:Int = Std.int(Math.abs(Math.min(singAnimations.length - 1, note.noteData)));
+	var baseAnimation:String = singAnimations[direction] + note.animSuffix;
+	for (stageCharacter in stageCharacters)
+	{
+		var assigned:Array<String> = stageCharacter.stageEditorNoteTypes;
+		if (assigned == null || !assigned.contains(note.noteType)) continue;
+
+		var animationToPlay:String = baseAnimation;
+		if (note.isSustainNote)
+		{
+			var holdAnimation:String = baseAnimation + '-hold';
+			if (stageCharacter.hasAnimation(holdAnimation)) animationToPlay = holdAnimation;
+			if (stageCharacter.getAnimationName() == animationToPlay || stageCharacter.getAnimationName() == animationToPlay + '-loop')
+				continue;
+		}
+		if (!stageCharacter.hasAnimation(animationToPlay)) continue;
+		stageCharacter.playAnim(animationToPlay, true);
+		stageCharacter.holdTimer = 0;
+		handled = true;
+	}
+	return handled;
+}
+
 function opponentNoteHit(note:Note):Void
 {
 	var result:Dynamic = callOnLuas('opponentNoteHitPre', [
@@ -3782,7 +3870,10 @@ function opponentNoteHit(note:Note):Void
 	if (songName != 'tutorial')
 		camZooming = true;
 
-	if (note.noteType == 'Hey!' && dad.hasAnimation('hey'))
+	// Stage Characters may sing alongside Dad. Only noAnimation suppresses
+	// the default character animation; assignment to a Stage Character does not.
+	playStageEditorCharacterNote(note);
+	if (!note.noAnimation && note.noteType == 'Hey!' && dad.hasAnimation('hey'))
 	{
 		dad.playAnim('hey', true);
 		dad.specialAnim = true;
@@ -3859,6 +3950,10 @@ public function goodNoteHit(note:Note):Void
 
 	if (!note.hitCausesMiss) // Common notes
 	{
+		// Stage Character routing is independent: a checked Stage Character can
+		// sing even when noAnimation is set, and can sing together with BF/GF
+		// when the default animation is allowed.
+		playStageEditorCharacterNote(note);
 		if (!note.noAnimation)
 		{
 			var animToPlay:String = singAnimations[Std.int(Math.abs(Math.min(singAnimations.length - 1, note.noteData)))] + note.animSuffix;
@@ -4113,6 +4208,26 @@ public function characterBopper(beat:Int):Void
 		boyfriend.dance();
 	if (dad != null && beat % dad.danceEveryNumBeats == 0 && !dad.getAnimationName().startsWith('sing') && !dad.stunned)
 		dad.dance();
+
+	// Stage Editor Characters are real Character instances, but they live inside
+	// the stage's boyfriend/dad/gf groups rather than in the three standard fields.
+	// Include them in the same beat-driven dance lifecycle so non-looping idle
+	// animations are restarted naturally, just like BF, Dad and GF.
+	var processedStageCharacters:Array<Character> = [];
+	for (tag in variables.keys())
+	{
+		var value:Dynamic = variables.get(tag);
+		if (!Std.isOfType(value, Character)) continue;
+		var stageCharacter:Character = cast value;
+		if (!stageCharacter.isStageEditorCharacter || processedStageCharacters.contains(stageCharacter)) continue;
+		processedStageCharacters.push(stageCharacter);
+
+		var danceInterval:Int = Std.int(Math.max(stageCharacter.danceEveryNumBeats, 1));
+		if (beat % danceInterval == 0
+			&& !stageCharacter.getAnimationName().startsWith('sing')
+			&& !stageCharacter.stunned)
+			stageCharacter.dance();
+	}
 }
 
 public function playerDance():Void

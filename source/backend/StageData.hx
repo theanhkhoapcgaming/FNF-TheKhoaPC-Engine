@@ -141,6 +141,45 @@ class StageData {
 						addedObjects.set('boyfriend', boyfriend);
 					}
 
+				case 'stageCharacter':
+					if(!ignoreFilters && !validateVisibility(data.filters != null ? data.filters : (LOW_QUALITY | HIGH_QUALITY))) continue;
+
+					// A Stage Editor character is a real Character instance, but is
+					// stored in the same object list as ordinary stage sprites.
+					var characterID:String = data.character;
+					if (characterID == null || characterID.length < 1)
+						characterID = 'bf';
+
+					try
+					{
+						// Match built-in characters: stage JSON stores the base position,
+						// then the character JSON positionArray is applied to the sprite.
+						var baseX:Float = data.x != null ? data.x : 0;
+						var baseY:Float = data.y != null ? data.y : 0;
+						var char:objects.Character = new objects.Character(baseX, baseY, characterID);
+						char.x += char.positionArray[0];
+						char.y += char.positionArray[1];
+						char.ID = num;
+						char.isStageEditorCharacter = true;
+						char.stageEditorNoteTypes = data.noteTypes != null ? cast data.noteTypes : [];
+						char.flipX = data.flipX == true;
+						char.flipY = data.flipY == true;
+
+						// Stage Character appearance/configuration comes from its character JSON;
+						// stage JSON additionally stores editor placement, filters, note types and flips.
+						if (!ClientPrefs.data.antialiasing) char.antialiasing = false;
+
+						if (group != null) group.add(char);
+						if (data.name != null && data.name.length > 0)
+							addedObjects.set(data.name, char);
+						else
+							trace('[Stage Character] Ignored character with an empty element name.');
+					}
+					catch (e:Dynamic)
+					{
+						trace('[Stage Character] Could not load "' + characterID + '": ' + e);
+					}
+
 				case 'square', 'sprite', 'animatedSprite':
 					if(!ignoreFilters && !validateVisibility(data.filters)) continue;
 

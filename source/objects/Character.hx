@@ -39,6 +39,12 @@ typedef AnimArray = {
 
 class Character extends FlxSprite
 {
+	// Custom Note Types assigned to this Character Element by the Stage Editor.
+	public var stageEditorNoteTypes:Array<String> = [];
+	// Marks Characters instantiated from Stage Editor stage objects.
+	// These still use the full Character update/beat lifecycle, unlike animated sprites.
+	public var isStageEditorCharacter:Bool = false;
+
 	/**
 	 * In case a character is missing, it will use this on its place
 	**/

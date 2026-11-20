@@ -1,6 +1,7 @@
 package states.editors.boxes;
 
 import backend.StageData;
+import objects.Character;
 import states.editors.content.PreloadListSubState;
 import backend.StageData.LoadFilters;
 
@@ -10,7 +11,7 @@ class StageEditorMainBox extends PsychUIBox {
 
     public function new(host:StageEditorState) {
         this.host = host;
-        super(FlxG.width - 225, 10, 200, 400, ['Meta', 'Data', 'Object']);
+        super(FlxG.width - 225, 10, 200, 420, ['Meta', 'Data', 'Object', 'Note Types']);
         addDataTab();
 		addObjectTab();
 		addMetaTab();
@@ -180,7 +181,26 @@ class StageEditorMainBox extends PsychUIBox {
 
 	var colorInputText:PsychUIInputText;
 	var nameInputText:PsychUIInputText;
+	var characterDropdown:PsychUIDropDownMenu;
+	var characterLabel:FlxText;
+	var characterChoices:Array<String> = [];
+	var noteTypeCheckboxes:Array<PsychUICheckBox> = [];
+	var noteTypeMenu:FlxSpriteGroup;
+	var noteTypeBaseX:Float = 10;
+	var noteTypeBaseY:Float = 28;
+	var noteTypeLabel:FlxText;
+	var noteTypeEmptyText:FlxText;
+	var noteTypeScrollLabel:FlxText;
+	var noteTypePagePrevious:PsychUIButton;
+	var noteTypePageNext:PsychUIButton;
+	var noteTypePageIndex:Int = 0;
+	var noteTypeVisibleCount:Int = 10;
+	var noteTypeListTop:Float = 0;
+	var characterAppearanceUI:Array<Dynamic> = [];
+	var noteTypesTabWasSelected:Bool = false;
 	var imgTxt:FlxText;
+	var imgButton:PsychUIButton;
+	var animationsButton:PsychUIButton;
 
 	var scaleStepperX:PsychUINumericStepper;
 	var scaleStepperY:PsychUINumericStepper;
@@ -229,7 +249,7 @@ class StageEditorMainBox extends PsychUIBox {
 					return;
 				}
 
-				if (StageData.reservedNames.contains(changedName))
+				if (StageData.reservedNames.contains(changedName.toLowerCase()) || ['bf', 'boyfriend', 'dad', 'opponent', 'gf', 'girlfriend', '0', '1', '2'].contains(changedName.toLowerCase()))
 				{
 					host.showOutput('To avoid conflicts, this name cannot be used!', true);
 					return;
@@ -252,9 +272,35 @@ class StageEditorMainBox extends PsychUIBox {
 		};
 		tab_group.add(nameInputText);
 
+		characterChoices = getCharacterChoices();
+		characterLabel = new FlxText(objX, 0, 150, 'Character:', 8);
+		characterDropdown = new PsychUIDropDownMenu(objX, 0, characterChoices, function(sel:Int, selectedID:String)
+		{
+			var selected = getSelected();
+			if (selected == null || selected.type != 'stageCharacter' || selectedID == null || selectedID.length < 1) return;
+			try
+			{
+				var char:Character = cast selected.sprite;
+				// The new Character ID supplies its own JSON configuration; keep only Stage placement.
+				var oldX:Float = selected.x;
+				var oldY:Float = selected.y;
+				char.changeCharacter(selectedID);
+				selected.x = oldX;
+				selected.y = oldY;
+				selected.characterID = selectedID;
+				characterDropdown.selectedLabel = selectedID;
+				host.unsavedProgress = true;
+				host.showOutput('Character changed to ' + selectedID);
+			}
+			catch (e:Dynamic)
+				host.showOutput('Could not change character: ' + e, true);
+		});
+		characterLabel.visible = false;
+		characterDropdown.visible = false;
+
 		objY += 35;
 		imgTxt = new FlxText(objX, objY - 15, 200, 'Image: ', 8);
-		var imgButton:PsychUIButton = new PsychUIButton(objX, objY, 'Change Image', function()
+		imgButton = new PsychUIButton(objX, objY, 'Change Image', function()
 		{
 			trace('attempt to load image');
 			host.loadImage();
@@ -262,7 +308,7 @@ class StageEditorMainBox extends PsychUIBox {
 		tab_group.add(imgButton);
 		tab_group.add(imgTxt);
 
-		var animationsButton:PsychUIButton = new PsychUIButton(objX + 90, objY, 'Animations', function()
+		animationsButton = new PsychUIButton(objX + 90, objY, 'Animations', function()
 		{
 			var selected = getSelected();
 			if (selected == null)
@@ -283,7 +329,9 @@ class StageEditorMainBox extends PsychUIBox {
 		tab_group.add(animationsButton);
 
 		objY += 45;
-		tab_group.add(new FlxText(objX, objY - 18, 80, 'Color:'));
+		var colorLabel = new FlxText(objX, objY - 18, 80, 'Color:');
+		tab_group.add(colorLabel);
+		characterAppearanceUI.push(colorLabel);
 		colorInputText = new PsychUIInputText(objX, objY, 80, 'FFFFFF', 8);
 		colorInputText.filterMode = ONLY_ALPHANUMERIC;
 		colorInputText.onChange = function(old:String, cur:String)
@@ -294,6 +342,7 @@ class StageEditorMainBox extends PsychUIBox {
 				selected.color = colorInputText.text;
 		};
 		tab_group.add(colorInputText);
+		characterAppearanceUI.push(colorInputText);
 
 		function updateScale()
 		{
@@ -304,12 +353,16 @@ class StageEditorMainBox extends PsychUIBox {
 		}
 
 		objY += 45;
-		tab_group.add(new FlxText(objX, objY - 18, 100, 'Scale (X/Y):'));
+		var scaleLabel = new FlxText(objX, objY - 18, 100, 'Scale (X/Y):');
+		tab_group.add(scaleLabel);
+		characterAppearanceUI.push(scaleLabel);
 		scaleStepperX = new PsychUINumericStepper(objX, objY, 0.05, 1, 0.05, 10, 2);
 		scaleStepperY = new PsychUINumericStepper(objX + 70, objY, 0.05, 1, 0.05, 10, 2);
 		scaleStepperX.onValueChange = scaleStepperY.onValueChange = updateScale;
 		tab_group.add(scaleStepperX);
 		tab_group.add(scaleStepperY);
+		characterAppearanceUI.push(scaleStepperX);
+		characterAppearanceUI.push(scaleStepperY);
 
 		function updateScroll()
 		{
@@ -320,15 +373,21 @@ class StageEditorMainBox extends PsychUIBox {
 		}
 
 		objY += 40;
-		tab_group.add(new FlxText(objX, objY - 18, 150, 'Scroll Factor (X/Y):'));
+		var scrollLabel = new FlxText(objX, objY - 18, 150, 'Scroll Factor (X/Y):');
+		tab_group.add(scrollLabel);
+		characterAppearanceUI.push(scrollLabel);
 		scrollStepperX = new PsychUINumericStepper(objX, objY, 0.05, 1, 0, 10, 2);
 		scrollStepperY = new PsychUINumericStepper(objX + 70, objY, 0.05, 1, 0, 10, 2);
 		scrollStepperX.onValueChange = scrollStepperY.onValueChange = updateScroll;
 		tab_group.add(scrollStepperX);
 		tab_group.add(scrollStepperY);
+		characterAppearanceUI.push(scrollStepperX);
+		characterAppearanceUI.push(scrollStepperY);
 
 		objY += 40;
-		tab_group.add(new FlxText(objX, objY - 18, 80, 'Opacity:'));
+		var alphaLabel = new FlxText(objX, objY - 18, 80, 'Opacity:');
+		tab_group.add(alphaLabel);
+		characterAppearanceUI.push(alphaLabel);
 		alphaStepper = new PsychUINumericStepper(objX, objY, 0.1, 1, 0, 1, 2, true);
 		alphaStepper.onValueChange = function()
 		{
@@ -338,6 +397,7 @@ class StageEditorMainBox extends PsychUIBox {
 				selected.alpha = alphaStepper.value;
 		};
 		tab_group.add(alphaStepper);
+		characterAppearanceUI.push(alphaStepper);
 
 		antialiasingCheckbox = new PsychUICheckBox(objX + 90, objY, 'Anti-Aliasing', 80);
 		antialiasingCheckbox.onClick = function()
@@ -356,9 +416,12 @@ class StageEditorMainBox extends PsychUIBox {
 			}
 		};
 		tab_group.add(antialiasingCheckbox);
+		characterAppearanceUI.push(antialiasingCheckbox);
 
 		objY += 40;
-		tab_group.add(new FlxText(objX, objY - 18, 80, 'Angle:'));
+		var angleLabel = new FlxText(objX, objY - 18, 80, 'Angle:');
+		tab_group.add(angleLabel);
+		characterAppearanceUI.push(angleLabel);
 		angleStepper = new PsychUINumericStepper(objX, objY, 10, 0, 0, 360, 0);
 		angleStepper.onValueChange = function()
 		{
@@ -368,6 +431,7 @@ class StageEditorMainBox extends PsychUIBox {
 				selected.angle = angleStepper.value;
 		};
 		tab_group.add(angleStepper);
+		characterAppearanceUI.push(angleStepper);
 
 		function updateFlip()
 		{
@@ -418,6 +482,147 @@ class StageEditorMainBox extends PsychUIBox {
 		highQualityCheckbox.onClick = recalcFilter;
 		tab_group.add(lowQualityCheckbox);
 		tab_group.add(highQualityCheckbox);
+
+		// Keep the Character selector at the bottom of the Object options.
+		objY += 25;
+		characterLabel.y = objY - 15;
+		characterDropdown.y = objY;
+		tab_group.add(characterLabel);
+		tab_group.add(characterDropdown);
+
+		noteTypeMenu = getTab('Note Types').menu;
+		var noteX = noteTypeBaseX;
+		var noteY = noteTypeBaseY;
+		noteTypeLabel = new FlxText(noteX, noteY - 18, 180, 'Custom Note Types (10/page):', 8);
+		noteTypeMenu.add(noteTypeLabel);
+		var availableNoteTypes:Array<String> = getStageNoteTypeChoices();
+		noteTypeEmptyText = new FlxText(noteX, noteY, 175, 'No custom Note Types found.', 8);
+		noteTypeEmptyText.visible = false;
+		noteTypeMenu.add(noteTypeEmptyText);
+		for (noteType in availableNoteTypes)
+		{
+			var check:PsychUICheckBox = new PsychUICheckBox(noteX, noteY, noteType, 175);
+			check.visible = false;
+			check.onClick = onStageNoteTypeToggle.bind(noteType, check);
+			noteTypeCheckboxes.push(check);
+			noteTypeMenu.add(check);
+		}
+		noteTypeListTop = noteY + 4;
+		noteTypeScrollLabel = new FlxText(noteX + 35, noteTypeListTop + noteTypeVisibleCount * 24 + 8, 120, '', 8);
+		noteTypeMenu.add(noteTypeScrollLabel);
+		noteTypePagePrevious = new PsychUIButton(noteX, noteTypeListTop + noteTypeVisibleCount * 24 + 4, '< Prev', function()
+		{
+			setNoteTypeScroll(noteTypePageIndex - 1);
+		}, 48, 20);
+		noteTypePageNext = new PsychUIButton(noteX + 145, noteTypeListTop + noteTypeVisibleCount * 24 + 4, 'Next >', function()
+		{
+			setNoteTypeScroll(noteTypePageIndex + 1);
+		}, 45, 20);
+		noteTypeMenu.add(noteTypePagePrevious);
+		noteTypeMenu.add(noteTypePageNext);
+		refreshNoteTypePage();
+
+	}
+
+
+	function setNoteTypeScroll(nextPage:Int):Void
+	{
+		var pageCount:Int = Std.int(Math.ceil(noteTypeCheckboxes.length / noteTypeVisibleCount));
+		var maxPage:Int = Std.int(Math.max(0, pageCount - 1));
+		noteTypePageIndex = Std.int(Math.max(0, Math.min(maxPage, nextPage)));
+		refreshNoteTypePage();
+	}
+
+	function refreshNoteTypePage():Void
+	{
+		var selected = getSelected();
+		var isCharacter:Bool = selected != null && selected.type == 'stageCharacter';
+		var pageCount:Int = Std.int(Math.ceil(noteTypeCheckboxes.length / noteTypeVisibleCount));
+		if (pageCount <= 0) noteTypePageIndex = 0;
+		else noteTypePageIndex = Std.int(Math.max(0, Math.min(pageCount - 1, noteTypePageIndex)));
+		var startIndex:Int = noteTypePageIndex * noteTypeVisibleCount;
+		var endIndex:Int = Std.int(Math.min(noteTypeCheckboxes.length, startIndex + noteTypeVisibleCount));
+		for (i in 0...noteTypeCheckboxes.length)
+		{
+			var check = noteTypeCheckboxes[i];
+			var onPage:Bool = i >= startIndex && i < endIndex;
+			// PsychUIBox moves its tab menu (and its members) in screen space.
+			// Re-anchor controls against the menu's current position; using only
+			// local coordinates here resets them toward (0, 0) after paging.
+			var row:Int = onPage ? i - startIndex : 0;
+			check.setPosition(noteTypeMenu.x + noteTypeBaseX,
+				noteTypeMenu.y + noteTypeListTop + row * 24);
+			check.visible = onPage && isCharacter;
+			check.active = onPage && isCharacter;
+			check.checked = isCharacter && selected.noteTypes != null && selected.noteTypes.contains(check.label);
+		}
+		if (noteTypeScrollLabel != null)
+			noteTypeScrollLabel.text = noteTypeCheckboxes.length == 0 ? '0 / 0' : (startIndex + 1) + '-' + endIndex + ' / ' + noteTypeCheckboxes.length;
+		if (noteTypePagePrevious != null)
+		{
+			noteTypePagePrevious.visible = isCharacter && pageCount > 1;
+			noteTypePagePrevious.active = isCharacter && pageCount > 1 && noteTypePageIndex > 0;
+		}
+		if (noteTypePageNext != null)
+		{
+			noteTypePageNext.visible = isCharacter && pageCount > 1;
+			noteTypePageNext.active = isCharacter && pageCount > 1 && noteTypePageIndex < pageCount - 1;
+		}
+		if (noteTypeEmptyText != null) noteTypeEmptyText.visible = isCharacter && noteTypeCheckboxes.length == 0;
+		if (noteTypeLabel != null) noteTypeLabel.visible = isCharacter;
+	}
+
+
+	function onStageNoteTypeToggle(noteType:String, check:PsychUICheckBox):Void
+	{
+		var selected = getSelected();
+		if (selected == null || selected.type != 'stageCharacter') return;
+		if (selected.noteTypes == null) selected.noteTypes = [];
+		if (check.checked)
+		{
+			if (!selected.noteTypes.contains(noteType)) selected.noteTypes.push(noteType);
+		}
+		else selected.noteTypes.remove(noteType);
+		host.unsavedProgress = true;
+	}
+
+	function getCharacterChoices():Array<String>
+	{
+		var list:Array<String> = Mods.mergeAllTextsNamed('data/characterList.txt');
+		var folders:Array<String> = Mods.directoriesWithFile(Paths.getSharedPath(), 'characters/');
+		for (folder in folders)
+			for (file in NativeFileSystem.readDirectory(folder))
+				if (file.toLowerCase().endsWith('.json'))
+				{
+					var id:String = file.substr(0, file.length - 5);
+					if (!list.contains(id)) list.push(id);
+				}
+		if (list.length < 1) list.push('bf');
+		return list;
+	}
+
+	function getStageNoteTypeChoices():Array<String>
+	{
+		var list:Array<String> = [];
+		var extensions:Array<String> = ['.txt'];
+		#if LUA_ALLOWED extensions.push('.lua'); #end
+		#if HSCRIPT_ALLOWED extensions.push('.hx'); #end
+		#if MODS_ALLOWED
+		for (folder in Mods.directoriesWithFile(Paths.getSharedPath(), 'custom_notetypes/'))
+			for (file in NativeFileSystem.readDirectory(folder))
+			{
+				var path:String = haxe.io.Path.join([folder, file]);
+				if (NativeFileSystem.isDirectory(path) || file.startsWith('readme.')) continue;
+				for (ext in extensions)
+					if (file.toLowerCase().endsWith(ext))
+					{
+						var id:String = file.substr(0, file.length - ext.length);
+						if (id.length > 0 && !list.contains(id)) list.push(id);
+						break;
+					}
+			}
+		#end
+		return list;
 	}
 
 	var oppDropdown:PsychUIDropDownMenu;
@@ -594,6 +799,17 @@ class StageEditorMainBox extends PsychUIBox {
 		colorInputText.text = selected.color;
 		nameInputText.text = selected.name;
 		imgTxt.text = 'Image: ' + selected.image;
+		imgButton.visible = animationsButton.visible = imgTxt.visible = (selected.type != 'stageCharacter');
+		characterLabel.visible = (selected.type == 'stageCharacter');
+		characterDropdown.visible = (selected.type == 'stageCharacter');
+		characterDropdown.selectedLabel = selected.characterID;
+		var isStageCharacter:Bool = selected.type == 'stageCharacter';
+		for (control in characterAppearanceUI)
+		{
+			control.visible = !isStageCharacter;
+			control.active = !isStageCharacter;
+		}
+		refreshNoteTypePage();
 
 		// Steppers
 		if (selected.type != 'square')
@@ -618,7 +834,8 @@ class StageEditorMainBox extends PsychUIBox {
 		alphaStepper.value = selected.alpha;
 
 		// Checkboxes
-		antialiasingCheckbox.visible = (selected.type != 'square');
+		antialiasingCheckbox.visible = (selected.type != 'square' && !isStageCharacter);
+		// Flip controls remain available for Custom Character stage objects.
 		flipXCheckBox.visible = (selected.type != 'square');
 		flipYCheckBox.visible = (selected.type != 'square');
 
@@ -628,4 +845,13 @@ class StageEditorMainBox extends PsychUIBox {
 		lowQualityCheckbox.checked = (selected.filters & LOW_QUALITY) == LOW_QUALITY;
 		highQualityCheckbox.checked = (selected.filters & HIGH_QUALITY) == HIGH_QUALITY;
     }
+
+	override function update(elapsed:Float):Void
+	{
+		super.update(elapsed);
+		var isNoteTypesSelected:Bool = selectedTab != null && selectedTab.name == 'Note Types' && !isMinimized;
+		if (isNoteTypesSelected && !noteTypesTabWasSelected)
+			refreshNoteTypePage();
+		noteTypesTabWasSelected = isNoteTypesSelected;
+	}
 }

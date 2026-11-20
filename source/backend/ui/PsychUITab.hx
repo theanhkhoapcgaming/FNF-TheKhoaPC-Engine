@@ -43,6 +43,10 @@ class PsychUITab extends FlxSprite
 	{
 		if(menu != null && menu.exists && menu.active)
 		{
+			// Position the menu before updating its children. Previously this was
+			// only assigned in drawMenu(), so a newly selected tab could update
+			// controls while its menu group was still at (0, 0).
+			menu.setPosition(parent.x, parent.y + parent.tabHeight);
 			menu.scrollFactor.set(parent.scrollFactor.x, parent.scrollFactor.y);
 			menu.update(elapsed);
 		}
