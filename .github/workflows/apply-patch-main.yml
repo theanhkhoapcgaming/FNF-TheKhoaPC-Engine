@@ -1,5 +1,5 @@
 
-name: Apply Patch to Main
+name: Apply Patch to Master
 
 on:
   workflow_dispatch:
@@ -14,26 +14,26 @@ permissions:
   contents: write
 
 concurrency:
-  group: apply-patch-main
+  group: apply-patch-master
   cancel-in-progress: false
 
 jobs:
   apply-patch:
-    name: Apply Git Patch Directly to Main
+    name: Apply Git Patch Directly to Master
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Main
+      - name: Checkout Master
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: master
           fetch-depth: 0
 
-      - name: Verify Main Branch
+      - name: Verify Master Branch
         run: |
           BRANCH=$(git branch --show-current)
-          if [ "$BRANCH" != "main" ]; then
-            echo "::error::This workflow only supports main."
+          if [ "$BRANCH" != "master" ]; then
+            echo "::error::This workflow only supports master."
             exit 1
           fi
 
@@ -69,6 +69,6 @@ jobs:
           git add -A
           git commit -m "Apply source update patch"
 
-      - name: Push Directly to Main
+      - name: Push Directly to Master
         run: |
-          git push origin HEAD:main
+          git push origin HEAD:master
