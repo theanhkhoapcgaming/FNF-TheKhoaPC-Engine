@@ -1,0 +1,74 @@
+
+name: Apply Patch to Main
+
+on:
+  workflow_dispatch:
+    inputs:
+      patch_file:
+        description: 'Patch file path in repository'
+        required: true
+        default: 'Latest-Updated-Source.patch'
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-patch-main
+  cancel-in-progress: false
+
+jobs:
+  apply-patch:
+    name: Apply Git Patch Directly to Main
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify Main Branch
+        run: |
+          BRANCH=$(git branch --show-current)
+          if [ "$BRANCH" != "main" ]; then
+            echo "::error::This workflow only supports main."
+            exit 1
+          fi
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Validate Patch
+        env:
+          PATCH_FILE: ${{ inputs.patch_file }}
+        run: |
+          if [ ! -f "$PATCH_FILE" ]; then
+            echo "::error::Patch file not found: $PATCH_FILE"
+            exit 1
+          fi
+
+          git apply --check "$PATCH_FILE"
+
+      - name: Apply Patch
+        env:
+          PATCH_FILE: ${{ inputs.patch_file }}
+        run: |
+          git apply "$PATCH_FILE"
+
+      - name: Commit Changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git add -A
+          git commit -m "Apply source update patch"
+
+      - name: Push Directly to Main
+        run: |
+          git push origin HEAD:main
