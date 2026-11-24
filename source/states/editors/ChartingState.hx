@@ -165,6 +165,8 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 	var dadScaleStepper:PsychUINumericStepper;
 	var gfScaleStepper:PsychUINumericStepper;
 	var p4ScaleStepper:PsychUINumericStepper;
+	var bfCustomNoteInput:PsychUIInputText;
+	var dadCustomNoteInput:PsychUIInputText;
 	var gfCustomNoteInput:PsychUIInputText;
 	var p4CustomNoteInput:PsychUIInputText;
 	var bfPreviewDragging:Bool = false;
@@ -193,6 +195,22 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 	var p4PreviewCharacter:Character;
 	var p4PreviewCharacterJson:Dynamic;
 	var p4PreviewJsonPath:String = '';
+	// Stage-driven Character Preview entries. Each entry maps directly to one
+	// stage JSON object whose type is 'stageCharacter'.
+	var stagePreviewData:Map<String, Dynamic> = new Map();
+	var stagePreviewOrder:Array<String> = [];
+	var stagePreviewCharacters:Map<String, Character> = new Map();
+	var stagePreviewScales:Map<String, Float> = new Map();
+	var stagePreviewX:Map<String, Float> = new Map();
+	var stagePreviewY:Map<String, Float> = new Map();
+	var stagePreviewLastAnimTime:Map<String, Float> = new Map();
+	var stagePreviewLastBeat:Map<String, Int> = new Map();
+	var stagePreviewScaleSteppers:Map<String, PsychUINumericStepper> = new Map();
+	var stagePreviewNoteInputs:Map<String, PsychUIInputText> = new Map();
+	var stagePreviewMenuButtons:Array<PsychUIButton> = [];
+	var stagePreviewDragKey:String = null;
+	var stagePreviewDragOffset:FlxPoint;
+	var stagePreviewStageName:String = '';
 	
 	var bfPreviewLastNote:Float = -1;
 	var dadPreviewLastNote:Float = -1;
@@ -255,6 +273,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 	var timeLine:FlxSprite;
 	var infoText:FlxText;
 	var infoRightText:FlxText;
+	var selectedNotesStatusText:FlxText;
 
 	var autoSaveIcon:FlxSprite;
 	var outputTxt:FlxText;
@@ -480,7 +499,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 			mainBox.setPosition(chartEditorSave.data.mainBoxPosition[0], chartEditorSave.data.mainBoxPosition[1]);
 		// The PsychUIBox tabs themselves are used as the File / Edit / View
 		// toolbar buttons. Their menus open directly below the top toolbar.
-		upperBox = new PsychUIBox(18 + upperBoxOffsetX, 9, 300, 300, ['File', 'Edit', 'View', 'Window']);
+		upperBox = new PsychUIBox(18 + upperBoxOffsetX, 9, 300, 300, ['File', 'Edit', 'View', 'Character Preview']);
 		upperBox.tabHeight = 26;
 		upperBox.updateTabs();
 		upperBox.scrollFactor.set();
@@ -745,6 +764,9 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		girlfriendDropDown.selectedLabel = PlayState.SONG.gfVersion;
 		stageDropDown.selectedLabel = PlayState.SONG.stage;
 		StageData.loadDirectory(PlayState.SONG);
+		// A newly loaded chart can change stages without firing the Stage dropdown
+		// callback. Rebuild the Stage-driven Character Preview list here as well.
+		refreshStageCharacterPreviewForLoadedChart();
 
 		// DATA TAB
 		gameOverCharDropDown.selectedLabel = PlayState.SONG.gameOverChar;
@@ -1829,9 +1851,16 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		if(Conductor.songPosition != lastTime || forceDataUpdate)
 		{
 			var curTime:String = FlxStringUtil.formatTime(Conductor.songPosition / 1000, true);
+			// curBeat is already the absolute integer beat for the song.
+			// Add only the fractional progress inside the current beat.
+			// Do not rebuild the beat number from the section start: that
+			// double-counts elapsed beats and can make odd beats appear even.
 			var beatDisplay:Float = curBeat;
 			if (cachedSectionTimes != null && cachedSectionCrochets != null && curSec >= 0 && curSec < cachedSectionTimes.length && curSec < cachedSectionCrochets.length && cachedSectionCrochets[curSec] > 0)
-				beatDisplay += (Conductor.songPosition - cachedSectionTimes[curSec]) / cachedSectionCrochets[curSec];
+			{
+				var beatsIntoSection:Float = (Conductor.songPosition - cachedSectionTimes[curSec]) / cachedSectionCrochets[curSec];
+				beatDisplay += beatsIntoSection - Math.floor(beatsIntoSection);
+			}
 			var leftStatus:String = '$curTime   Beat: ${FlxMath.roundDecimal(beatDisplay, 2)}   Step: $curStep';
 			var bpmStatus:String = '${FlxMath.roundDecimal(Conductor.bpm, 2)}';
 			var remaining:String = (FlxG.sound.music != null)
@@ -2080,6 +2109,9 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 
 	function onSelectNote()
 	{
+		if (selectedNotesStatusText != null)
+			selectedNotesStatusText.text = 'Selected Notes: ${selectedNotes.length}';
+
 		if(selectedNotes.length == 1) //Only one note selected
 		{
 			var note:MetaNote = selectedNotes[0];
@@ -3703,6 +3735,16 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		{
 			PlayState.SONG.stage = stage;
 			StageData.loadDirectory(PlayState.SONG);
+			for (key in stagePreviewOrder) { var preview = stagePreviewCharacters.get(key); if (preview != null) remove(preview, true); }
+			stagePreviewCharacters = new Map();
+			stagePreviewData = new Map();
+			stagePreviewOrder = [];
+			stagePreviewStageName = '';
+			if (characterScaleBox != null) { remove(characterScaleBox, true); characterScaleBox = null; stagePreviewScaleSteppers = new Map(); stagePreviewNoteInputs = new Map(); gfCustomNoteInput = null; p4CustomNoteInput = null; stagePreviewLastBeat = new Map(); stagePreviewLastAnimTime = new Map(); }
+			var previewTab = upperBox.getTab('Character Preview');
+			if (previewTab != null) { previewTab.menu.clear(); addWindowTab(); }
+			if (bfPreviewCharacter != null || dadPreviewCharacter != null || gfPreviewCharacter != null) ensureCharacterScaleBox();
+			updateStagePreviewPanelVisibility();
 			trace('selected $stage');
 		});
 		
@@ -3831,7 +3873,8 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		infoBox.cameras = [camUI];
 		infoBox.scrollFactor.set();
 
-		var barHeight:Int = 50;
+		// Two-row status bar: selection summary above the transport / beat information.
+		var barHeight:Int = 64;
 		var barY:Float = FlxG.height - barHeight;
 		var background = new FlxSprite(0, barY).makeGraphic(1, 1, 0xFF303236);
 		background.setGraphicSize(FlxG.width, barHeight);
@@ -3845,14 +3888,22 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		topLine.scrollFactor.set();
 		infoBox.add(topLine);
 
-		infoText = new FlxText(12, barY + 15, Math.max(250, FlxG.width * 0.36), '', 16);
-		infoText.setFormat(null, 16, FlxColor.WHITE, LEFT, OUTLINE_FAST, FlxColor.BLACK);
+		// Keep the centered alignment from Beat-Calculation-Restored,
+		// but place the selection summary inside the status bar's top row.
+		selectedNotesStatusText = new FlxText(12, barY + 5, FlxG.width - 24, 'Selected Notes: ${selectedNotes.length}', 14);
+		selectedNotesStatusText.setFormat(null, 14, FlxColor.WHITE, CENTER, OUTLINE_FAST, FlxColor.BLACK);
+		selectedNotesStatusText.borderSize = 1;
+		selectedNotesStatusText.scrollFactor.set();
+		infoBox.add(selectedNotesStatusText);
+
+		infoText = new FlxText(12, barY + 39, Math.max(180, FlxG.width * 0.30), '', 14);
+		infoText.setFormat(null, 14, FlxColor.WHITE, LEFT, OUTLINE_FAST, FlxColor.BLACK);
 		infoText.borderSize = 1;
 		infoText.scrollFactor.set();
 		infoBox.add(infoText);
 
-		infoRightText = new FlxText(FlxG.width * 0.70, barY + 15, FlxG.width * 0.29 - 12, '', 16);
-		infoRightText.setFormat(null, 16, FlxColor.WHITE, RIGHT, OUTLINE_FAST, FlxColor.BLACK);
+		infoRightText = new FlxText(FlxG.width * 0.70, barY + 39, FlxG.width * 0.29 - 12, '', 14);
+		infoRightText.setFormat(null, 14, FlxColor.WHITE, RIGHT, OUTLINE_FAST, FlxColor.BLACK);
 		infoRightText.borderSize = 1;
 		infoRightText.scrollFactor.set();
 		infoBox.add(infoRightText);
@@ -3865,7 +3916,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		for (i in 0...labels.length)
 		{
 			var index:Int = i;
-			var button = new PsychUIButton(buttonX + i * (buttonWidth + buttonGap), barY + 12, labels[i], function()
+			var button = new PsychUIButton(buttonX + i * (buttonWidth + buttonGap), barY + 32, labels[i], function()
 			{
 				switch(index)
 				{
@@ -3915,10 +3966,10 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		chartEditorToolbar.add(bar);
 
 		// Keep the original button dimensions and spacing, but center the whole toolbar.
-		var buttonWidth:Int = 72;
+		var buttonWidth:Int = 108;
 		var buttonHeight:Int = 26;
 		var buttonGap:Int = 8;
-		var menuNames:Array<String> = ['File', 'Edit', 'View', 'Window'];
+		var menuNames:Array<String> = ['File', 'Edit', 'View', 'Character Preview'];
 		var totalWidth:Int = (menuNames.length + 1) * buttonWidth + menuNames.length * buttonGap;
 		var startX:Float = (FlxG.width - totalWidth) / 2;
 		upperBox.setPosition(startX, 9);
@@ -3953,50 +4004,198 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		add(chartEditorToolbar);
 	}
 
+	function refreshStageCharacterPreviewForLoadedChart():Void
+	{
+		// Remove previews belonging to the previously loaded stage. The permanent
+		// BF/Dad/GF previews are intentionally preserved.
+		for (key in stagePreviewOrder)
+		{
+			var preview:Character = stagePreviewCharacters.get(key);
+			if (preview != null) remove(preview, true);
+		}
+		stagePreviewCharacters = new Map();
+		stagePreviewData = new Map();
+		stagePreviewOrder = [];
+		stagePreviewStageName = '';
+
+		// The scale/settings box contains one tab per stage character, so rebuild
+		// it against the newly loaded stage instead of retaining stale tabs.
+		if (characterScaleBox != null)
+		{
+			remove(characterScaleBox, true);
+			characterScaleBox = null;
+			stagePreviewScaleSteppers = new Map();
+			stagePreviewNoteInputs = new Map();
+			stagePreviewLastBeat = new Map();
+			stagePreviewLastAnimTime = new Map();
+			gfCustomNoteInput = null;
+			p4CustomNoteInput = null;
+		}
+
+		if (upperBox != null && upperBox.getTab('Character Preview') != null)
+			addWindowTab();
+
+		if (bfPreviewCharacter != null || dadPreviewCharacter != null || gfPreviewCharacter != null || p4PreviewCharacter != null)
+			ensureCharacterScaleBox();
+		updateStagePreviewPanelVisibility();
+	}
+
 	function addWindowTab():Void
 	{
-		var tab = upperBox.getTab('Window');
+		// Character Preview is always available, even when the selected stage has
+		// no stageCharacter objects. BF/Dad/GF are the three permanent entries.
+		var tab = upperBox.getTab('Character Preview');
+		if (tab == null) return;
 		var group = tab.menu;
-		// Dropdown rows must not inherit the narrow width of a toolbar tab.
-		var btnX = 0;
-		var btnY = 1;
-		var btnWid = 220;
-
-		var bfButton = new PsychUIButton(btnX, btnY, '  Show BF Character', function()
+		group.clear();
+		stagePreviewMenuButtons = [];
+		loadStageCharacterPreviewDefinitions();
+		var btnY:Int = 1;
+		addCharacterPreviewMenuButton(group, 'bf', 'BF', btnY, function() toggleCharacterPreview(true));
+		btnY += 25;
+		addCharacterPreviewMenuButton(group, 'dad', 'Dad', btnY, function() toggleCharacterPreview(false));
+		btnY += 25;
+		addCharacterPreviewMenuButton(group, 'gf', 'GF', btnY, function() toggleGFCharacterPreview());
+		btnY += 29;
+		var divider:FlxText = new FlxText(8, btnY, 235, 'STAGE CHARACTERS', 9);
+		divider.color = 0xFF9EACC2;
+		group.add(divider);
+		btnY += 18;
+		var index:Int = 0;
+		for (key in stagePreviewOrder)
 		{
-			closeChartEditorMenu();
-			toggleCharacterPreview(true);
-		}, btnWid);
-		bfButton.text.alignment = LEFT;
-		group.add(bfButton);
-
-		btnY += 24;
-		var dadButton = new PsychUIButton(btnX, btnY, '  Show Dad Character', function()
+			var data:Dynamic = stagePreviewData.get(key);
+			var label:String = data.name != null && data.name.length > 0 ? data.name : 'Character ${index + 1}';
+			addCharacterPreviewMenuButton(group, key, label, btnY, function() toggleStageCharacterPreview(key));
+			btnY += 25;
+			index++;
+		}
+		if (index == 0)
 		{
-			closeChartEditorMenu();
-			toggleCharacterPreview(false);
-		}, btnWid);
-		dadButton.text.alignment = LEFT;
-		group.add(dadButton);
+			var empty:FlxText = new FlxText(10, btnY + 2, 230, 'No additional stage characters.', 8);
+			empty.color = 0xFF8993A3;
+			group.add(empty);
+		}
+	}
 
-		btnY += 24;
-		var gfButton = new PsychUIButton(btnX, btnY, '  Show GF Character', function()
+	function addCharacterPreviewMenuButton(group:FlxSpriteGroup, key:String, label:String, y:Int, callback:Void->Void):Void
+	{
+		var button:PsychUIButton = null;
+		button = new PsychUIButton(0, y, (isPreviewCharacterVisible(key) ? '  Hide ' : '  Show ') + label + ' character', function()
 		{
+			callback();
+			button.text.text = (isPreviewCharacterVisible(key) ? '  Hide ' : '  Show ') + label + ' character';
 			closeChartEditorMenu();
-		toggleGFCharacterPreview();
-		}, btnWid);
-		gfButton.text.alignment = LEFT;
-		group.add(gfButton);
+		}, 250);
+		button.text.alignment = LEFT;
+		group.add(button);
+		stagePreviewMenuButtons.push(button);
+	}
 
-		btnY += 24;
-		var p4Button = new PsychUIButton(btnX, btnY, '  Show Player 4 Character', function()
+	function isPreviewCharacterVisible(key:String):Bool
+	{
+		switch (key)
 		{
-			closeChartEditorMenu();
-			if (p4PreviewCharacterJson == null) loadPlayer4CharacterJson();
-			else togglePlayer4Preview();
-		}, btnWid);
-		p4Button.text.alignment = LEFT;
-		group.add(p4Button);
+			case 'bf': return bfPreviewCharacter != null;
+			case 'dad': return dadPreviewCharacter != null;
+			case 'gf': return gfPreviewCharacter != null;
+			default: return stagePreviewCharacters.get(key) != null;
+		}
+	}
+
+	function loadStageCharacterPreviewDefinitions():Void
+	{
+		var stageName:String = PlayState.SONG != null && PlayState.SONG.stage != null && PlayState.SONG.stage.length > 0 ? PlayState.SONG.stage : 'stage';
+		if (stagePreviewStageName == stageName && stagePreviewOrder.length > 0) return;
+		stagePreviewStageName = stageName;
+		stagePreviewData = new Map();
+		stagePreviewOrder = [];
+
+		// Read the exact same stages/<stage>.json file used by Stage Editor.
+		// StageData.getStageFile() can return its dummy stage when the current
+		// Paths level/mod context has not resolved the file yet, so try the direct
+		// resolved path first and retain StageData as a fallback.
+		var stageFile:Dynamic = null;
+		try
+		{
+			var stagePath:String = Paths.getPath('stages/' + stageName + '.json', TEXT, null, true);
+			if (stagePath != null && NativeFileSystem.exists(stagePath))
+				stageFile = tjson.TJSON.parse(NativeFileSystem.getContent(stagePath));
+		}
+		catch (e:Dynamic)
+		{
+			trace('[Character Preview] Direct stage JSON read failed for ' + stageName + ': ' + e);
+		}
+		if (stageFile == null) stageFile = StageData.getStageFile(stageName);
+		var objects:Array<Dynamic> = stageFile != null ? cast Reflect.field(stageFile, 'objects') : null;
+		if (objects == null) return;
+
+		var previewIndex:Int = 0;
+		for (i in 0...objects.length)
+		{
+			var data:Dynamic = objects[i];
+			if (data == null || Std.string(Reflect.field(data, 'type')) != 'stageCharacter') continue;
+			// Stage Editor serializes the character's actual Character JSON ID as
+			// `character` (not `characterID`) and its exclusive bindings as `noteTypes`.
+			var characterID:String = Reflect.field(data, 'character');
+			if (characterID == null || characterID.length == 0) characterID = 'bf';
+			var objectName:String = Reflect.field(data, 'name');
+			if (objectName == null || objectName.length == 0) objectName = 'stageCharacter_$i';
+			var key:String = '$stageName:$i:$objectName';
+			stagePreviewData.set(key, data);
+			stagePreviewOrder.push(key);
+			if (!stagePreviewScales.exists(key)) stagePreviewScales.set(key, 0.5);
+			// Character Preview is an editor-only workspace: do not inherit the
+			// Stage object's world position. Give each preview a convenient initial
+			// position; the user can freely drag it afterwards.
+			var baseX:Float = 180 + (previewIndex % 4) * 250;
+			var baseY:Float = 250 + Std.int(previewIndex / 4) * 80;
+			if (!stagePreviewX.exists(key)) stagePreviewX.set(key, baseX);
+			if (!stagePreviewY.exists(key)) stagePreviewY.set(key, baseY);
+			previewIndex++;
+		}
+		trace('[Character Preview] Loaded ' + stagePreviewOrder.length + ' stageCharacter object(s) from stages/' + stageName + '.json');
+	}
+
+	function toggleStageCharacterPreview(key:String):Void
+	{
+		var current:Character = stagePreviewCharacters.get(key);
+		if (current != null)
+		{
+			remove(current, true);
+			stagePreviewCharacters.remove(key);
+			updateStagePreviewPanelVisibility();
+			return;
+		}
+		var data:Dynamic = stagePreviewData.get(key);
+		if (data == null) return;
+		var characterID:String = Reflect.field(data, 'character');
+		if (characterID == null || characterID.length == 0) characterID = 'bf';
+		try
+		{
+			var character:Character = new Character(stagePreviewX.get(key), stagePreviewY.get(key), characterID, false);
+			// Preview-only instance: use the Stage object's `character` field to
+			// load the Character JSON and retain `noteTypes` as this preview's
+			// exclusive Note Type binding. Do not enable Stage gameplay behavior,
+			// inherit Stage x/y, or apply Stage flip/position settings.
+			character.flipX = data.flipX == true;
+			character.flipY = data.flipY == true;
+			character.scrollFactor.set(0, 0);
+			character.cameras = [camUI];
+			var scale:Float = stagePreviewScales.get(key);
+			character.scale.set(scale, scale);
+			character.updateHitbox();
+			character.dance();
+			// Apply the same idle-relative animation offset normalization used by BF/Dad/GF
+			// immediately, so the fourth (and later) Stage Character is aligned from its first frame.
+			applyNormalizedPreviewAnimationOffset(character);
+			stagePreviewCharacters.set(key, character);
+			add(character);
+			ensureCharacterScaleBox();
+			updateStagePreviewPanelVisibility();
+			positionChartCharacters();
+		}
+		catch (e:Dynamic) showOutput('Could not create stage character preview "$characterID": $e', true);
 	}
 
 	function toggleCharacterPreview(isBF:Bool):Void
@@ -4006,6 +4205,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		{
 			remove(character, true);
 			if (isBF) bfPreviewCharacter = null else dadPreviewCharacter = null;
+			updateStagePreviewPanelVisibility();
 			return;
 		}
 		var characterName:String = isBF ? PlayState.SONG.player1 : PlayState.SONG.player2;
@@ -4027,6 +4227,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		character.updateHitbox();
 		add(character); // Added after the chart objects so the sprite renders above the grid and receptors.
 		ensureCharacterScaleBox();
+		updateStagePreviewPanelVisibility();
 		positionChartCharacters();
 	}
 
@@ -4036,6 +4237,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		{
 			remove(gfPreviewCharacter, true);
 			gfPreviewCharacter = null;
+			updateStagePreviewPanelVisibility();
 			return;
 		}
 		var gfName:String = PlayState.SONG.gfVersion != null && PlayState.SONG.gfVersion.length > 0 ? PlayState.SONG.gfVersion : 'gf';
@@ -4048,6 +4250,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		gfPreviewLastNote = -1; gfPreviewLastAnimTime = Conductor.songPosition; gfPreviewLastBeat = curBeat;
 		add(character);
 		ensureCharacterScaleBox();
+		updateStagePreviewPanelVisibility();
 		positionChartCharacters();
 	}
 
@@ -4094,6 +4297,8 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		character.scale.set(p4PreviewScale, p4PreviewScale);
 		character.updateHitbox();
 		character.dance();
+		// Player 4 uses the exact same idle-relative offset normalization as BF/Dad/GF.
+		applyNormalizedPreviewAnimationOffset(character);
 		p4PreviewCharacter = character;
 		p4PreviewLastNote = -1; p4PreviewLastAnimTime = Conductor.songPosition; p4PreviewLastBeat = curBeat;
 		add(character);
@@ -4104,7 +4309,19 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 	function ensureCharacterScaleBox():Void
 	{
 		if (characterScaleBox != null) return;
-		characterScaleBox = new PsychUIBox(FlxG.width - 290, 300, 270, 225, ['BF', 'Dad', 'GF', 'Player 4']);
+		loadStageCharacterPreviewDefinitions();
+		var tabNames:Array<String> = ['BF', 'Dad', 'GF'];
+		var stageTabNames:Map<String, String> = new Map();
+		for (key in stagePreviewOrder)
+		{
+			var data:Dynamic = stagePreviewData.get(key);
+			var label:String = data != null && data.name != null && data.name.length > 0 ? data.name : key;
+			if (label.length > 18) label = label.substr(0, 18);
+			while (tabNames.contains(label)) label += '_';
+			tabNames.push(label);
+			stageTabNames.set(key, label);
+		}
+		characterScaleBox = new PsychUIBox(FlxG.width - 300, 300, 280, 205, tabNames);
 		characterScaleBox.cameras = [camUI];
 		characterScaleBox.scrollFactor.set();
 		characterScaleBox.canMove = true;
@@ -4112,86 +4329,265 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		characterScaleBox.unselectedStyle = {bgColor: 0xFF222831, textColor: FlxColor.WHITE, bgAlpha: 0.9};
 		characterScaleBox.bg.color = 0xFF171A20;
 		characterScaleBox.bg.alpha = 0.96;
-		bfScaleStepper = new PsychUINumericStepper(12, 48, 0.05, bfPreviewScale, 0.05, 5, 2, 90);
-		dadScaleStepper = new PsychUINumericStepper(12, 48, 0.05, dadPreviewScale, 0.05, 5, 2, 90);
-		gfScaleStepper = new PsychUINumericStepper(12, 48, 0.05, gfPreviewScale, 0.05, 5, 2, 90);
-		p4ScaleStepper = new PsychUINumericStepper(12, 48, 0.05, p4PreviewScale, 0.05, 5, 2, 90);
-		characterScaleBox.getTab('BF').menu.add(bfScaleStepper);
-		characterScaleBox.getTab('Dad').menu.add(dadScaleStepper);
-		characterScaleBox.getTab('GF').menu.add(gfScaleStepper);
-		characterScaleBox.getTab('Player 4').menu.add(p4ScaleStepper);
-		characterScaleBox.getTab('GF').menu.add(new FlxText(12, 82, 230, 'GF Custom Note Types (comma separated):', 8));
-		gfCustomNoteInput = new PsychUIInputText(12, 100, 230, '', 8);
-		characterScaleBox.getTab('GF').menu.add(gfCustomNoteInput);
-		characterScaleBox.getTab('Player 4').menu.add(new FlxText(12, 82, 230, 'Player 4 Custom Note Types:', 8));
-		p4CustomNoteInput = new PsychUIInputText(12, 100, 230, '', 8);
-		characterScaleBox.getTab('Player 4').menu.add(p4CustomNoteInput);
-		var loadP4Button = new PsychUIButton(12, 132, 'Load Character JSON...', function() loadPlayer4CharacterJson(), 220, 24);
-		characterScaleBox.getTab('Player 4').menu.add(loadP4Button);
+
+		var bfTab = characterScaleBox.getTab('BF');
+		bfScaleStepper = addPreviewScaleControls(bfTab.menu, bfPreviewScale, 'BF Preview Zoom:');
+		bfCustomNoteInput = addPreviewNoteTypeControls(bfTab.menu, 100, 'BF-only Note Types:');
+		var dadTab = characterScaleBox.getTab('Dad');
+		dadScaleStepper = addPreviewScaleControls(dadTab.menu, dadPreviewScale, 'Dad Preview Zoom:');
+		dadCustomNoteInput = addPreviewNoteTypeControls(dadTab.menu, 100, 'Dad-only Note Types:');
+		var gfTab = characterScaleBox.getTab('GF');
+		gfScaleStepper = addPreviewScaleControls(gfTab.menu, gfPreviewScale, 'GF Preview Zoom:');
+		gfCustomNoteInput = addPreviewNoteTypeControls(gfTab.menu, 100, 'GF Note Types (dual-route):');
+		var gfInfo:FlxText = new FlxText(12, 130, 240, 'GF types can trigger GF and the active BF/Dad lane character.', 8);
+		gfInfo.color = 0xFFB8C4D8;
+		gfTab.menu.add(gfInfo);
+
+		for (key in stagePreviewOrder)
+		{
+			var tabName:String = stageTabNames.get(key);
+			var data:Dynamic = stagePreviewData.get(key);
+			var tab = characterScaleBox.getTab(tabName);
+			var scale:Float = stagePreviewScales.get(key);
+			var stepper:PsychUINumericStepper = addPreviewScaleControls(tab.menu, scale, 'Character Preview Zoom:');
+			stagePreviewScaleSteppers.set(key, stepper);
+			var noteLabel:FlxText = new FlxText(12, 100, 240, 'Additional exclusive Note Types:', 8);
+			tab.menu.add(noteLabel);
+			var noteInput:PsychUIInputText = new PsychUIInputText(12, 118, 230, '', 8);
+			tab.menu.add(noteInput);
+			stagePreviewNoteInputs.set(key, noteInput);
+			var stageTypes:Array<String> = data != null && data.noteTypes != null ? cast data.noteTypes : [];
+			var info:FlxText = new FlxText(12, 148, 240, 'Stage-bound: ' + (stageTypes.length > 0 ? stageTypes.join(', ') : '(none)'), 8);
+			info.color = 0xFFB8C4D8;
+			tab.menu.add(info);
+		}
 		add(characterScaleBox);
+		updateStagePreviewPanelVisibility();
+	}
+
+	function addPreviewScaleControls(menu:FlxSpriteGroup, initialScale:Float, label:String):PsychUINumericStepper
+	{
+		menu.add(new FlxText(12, 30, 230, label, 9));
+		var stepper:PsychUINumericStepper = new PsychUINumericStepper(12, 48, 0.05, initialScale, 0.05, 5, 2, 90);
+		menu.add(stepper);
+		return stepper;
+	}
+
+	function addPreviewNoteTypeControls(menu:FlxSpriteGroup, y:Int, label:String):PsychUIInputText
+	{
+		menu.add(new FlxText(12, y - 18, 240, label, 8));
+		var input:PsychUIInputText = new PsychUIInputText(12, y, 230, '', 8);
+		menu.add(input);
+		return input;
+	}
+
+	function updateStagePreviewPanelVisibility():Void
+	{
+		if (characterScaleBox == null) return;
+		var anyVisible:Bool = bfPreviewCharacter != null || dadPreviewCharacter != null || gfPreviewCharacter != null;
+		for (key in stagePreviewOrder) if (stagePreviewCharacters.get(key) != null) anyVisible = true;
+		characterScaleBox.visible = characterScaleBox.active = anyVisible;
 	}
 
 	function positionChartCharacters():Void
 	{
-		// These are stable screen-space anchors. Character.playAnim() remains the sole
-		// owner of per-animation offsets; never bake those offsets into these values.
-		if (bfPreviewCharacter != null) { bfPreviewCharacter.x = bfPreviewX; bfPreviewCharacter.y = bfPreviewY; bfPreviewCharacter.scrollFactor.set(0, 0); }
-		if (dadPreviewCharacter != null) { dadPreviewCharacter.x = dadPreviewX; dadPreviewCharacter.y = dadPreviewY; dadPreviewCharacter.scrollFactor.set(0, 0); }
-		if (gfPreviewCharacter != null) { gfPreviewCharacter.x = gfPreviewX; gfPreviewCharacter.y = gfPreviewY; gfPreviewCharacter.scrollFactor.set(0, 0); }
-		if (p4PreviewCharacter != null) { p4PreviewCharacter.x = p4PreviewX; p4PreviewCharacter.y = p4PreviewY; p4PreviewCharacter.scrollFactor.set(0, 0); }
+		for (key in stagePreviewOrder)
+		{
+			var character:Character = stagePreviewCharacters.get(key);
+			if (character != null)
+			{
+				// These coordinates belong exclusively to the Preview workspace and
+				// are updated by updateDraggableChartCharacters() while dragging.
+				character.x = stagePreviewX.get(key);
+				character.y = stagePreviewY.get(key);
+				character.scrollFactor.set(0, 0);
+			}
+		}
 	}
 
 	function updateDraggableChartCharacters():Void
 	{
+		// Keep live zoom controls responsive for every preview entry.
 		if (characterScaleBox != null)
 		{
+			for (key in stagePreviewScaleSteppers.keys())
+			{
+				var stepper = stagePreviewScaleSteppers.get(key);
+				var character = stagePreviewCharacters.get(key);
+				if (stepper != null && character != null && stepper.value != stagePreviewScales.get(key))
+				{
+					stagePreviewScales.set(key, stepper.value);
+					character.scale.set(stepper.value, stepper.value);
+					character.updateHitbox();
+				}
+			}
 			if (bfScaleStepper != null && bfPreviewCharacter != null && bfScaleStepper.value != bfPreviewScale) { bfPreviewScale = bfScaleStepper.value; bfPreviewCharacter.scale.set(bfPreviewScale, bfPreviewScale); bfPreviewCharacter.updateHitbox(); }
 			if (dadScaleStepper != null && dadPreviewCharacter != null && dadScaleStepper.value != dadPreviewScale) { dadPreviewScale = dadScaleStepper.value; dadPreviewCharacter.scale.set(dadPreviewScale, dadPreviewScale); dadPreviewCharacter.updateHitbox(); }
 			if (gfScaleStepper != null && gfPreviewCharacter != null && gfScaleStepper.value != gfPreviewScale) { gfPreviewScale = gfScaleStepper.value; gfPreviewCharacter.scale.set(gfPreviewScale, gfPreviewScale); gfPreviewCharacter.updateHitbox(); }
 			if (p4ScaleStepper != null && p4PreviewCharacter != null && p4ScaleStepper.value != p4PreviewScale) { p4PreviewScale = p4ScaleStepper.value; p4PreviewCharacter.scale.set(p4PreviewScale, p4PreviewScale); p4PreviewCharacter.updateHitbox(); }
 		}
+
 		var mousePoint:FlxPoint = FlxG.mouse.getWorldPosition(camUI);
-		if (FlxG.mouse.justPressed)
+
+		// One drag controller handles BF, Dad, GF, Player 4 and every stageCharacter.
+		// Store the sprite origin relative to the mouse, not its rendered top-left;
+		// this keeps the character under the cursor even with animation offsets.
+		if (FlxG.mouse.justPressed && stagePreviewDragKey == null)
 		{
-			if (isMouseOverCharacterSprite(bfPreviewCharacter, mousePoint.x, mousePoint.y)) { bfPreviewDragging = true; bfDragOffset = FlxPoint.get((bfPreviewCharacter.x - bfPreviewCharacter.offset.x) - mousePoint.x, (bfPreviewCharacter.y - bfPreviewCharacter.offset.y) - mousePoint.y); }
-			else if (isMouseOverCharacterSprite(dadPreviewCharacter, mousePoint.x, mousePoint.y)) { dadPreviewDragging = true; dadDragOffset = FlxPoint.get((dadPreviewCharacter.x - dadPreviewCharacter.offset.x) - mousePoint.x, (dadPreviewCharacter.y - dadPreviewCharacter.offset.y) - mousePoint.y); }
-			else if (isMouseOverCharacterSprite(gfPreviewCharacter, mousePoint.x, mousePoint.y)) { gfPreviewDragging = true; gfDragOffset = FlxPoint.get((gfPreviewCharacter.x - gfPreviewCharacter.offset.x) - mousePoint.x, (gfPreviewCharacter.y - gfPreviewCharacter.offset.y) - mousePoint.y); }
-			else if (isMouseOverCharacterSprite(p4PreviewCharacter, mousePoint.x, mousePoint.y)) { p4PreviewDragging = true; p4DragOffset = FlxPoint.get((p4PreviewCharacter.x - p4PreviewCharacter.offset.x) - mousePoint.x, (p4PreviewCharacter.y - p4PreviewCharacter.offset.y) - mousePoint.y); }
+			var pickedKey:String = null;
+			var pickedCharacter:Character = null;
+
+			// Stage objects are tested from last to first because later stage objects
+			// are rendered above earlier ones.
+			var i:Int = stagePreviewOrder.length - 1;
+			while (i >= 0 && pickedCharacter == null)
+			{
+				var key:String = stagePreviewOrder[i];
+				var candidate:Character = stagePreviewCharacters.get(key);
+				if (isMouseOverCharacterSprite(candidate, mousePoint.x, mousePoint.y))
+				{
+					pickedKey = key;
+					pickedCharacter = candidate;
+				}
+				i--;
+			}
+
+			// Then test the built-in previews in their render order.
+			if (pickedCharacter == null && isMouseOverCharacterSprite(p4PreviewCharacter, mousePoint.x, mousePoint.y)) { pickedKey = 'p4'; pickedCharacter = p4PreviewCharacter; }
+			if (pickedCharacter == null && isMouseOverCharacterSprite(gfPreviewCharacter, mousePoint.x, mousePoint.y)) { pickedKey = 'gf'; pickedCharacter = gfPreviewCharacter; }
+			if (pickedCharacter == null && isMouseOverCharacterSprite(dadPreviewCharacter, mousePoint.x, mousePoint.y)) { pickedKey = 'dad'; pickedCharacter = dadPreviewCharacter; }
+			if (pickedCharacter == null && isMouseOverCharacterSprite(bfPreviewCharacter, mousePoint.x, mousePoint.y)) { pickedKey = 'bf'; pickedCharacter = bfPreviewCharacter; }
+
+			if (pickedCharacter != null)
+			{
+				stagePreviewDragKey = pickedKey;
+				stagePreviewDragOffset = FlxPoint.get(pickedCharacter.x - mousePoint.x, pickedCharacter.y - mousePoint.y);
+			}
 		}
-		if (FlxG.mouse.released) { bfPreviewDragging = dadPreviewDragging = gfPreviewDragging = p4PreviewDragging = false; }
-		if (bfPreviewDragging && bfDragOffset != null && bfPreviewCharacter != null) { bfPreviewX = mousePoint.x + bfDragOffset.x + bfPreviewCharacter.offset.x; bfPreviewY = mousePoint.y + bfDragOffset.y + bfPreviewCharacter.offset.y; }
-		if (dadPreviewDragging && dadDragOffset != null && dadPreviewCharacter != null) { dadPreviewX = mousePoint.x + dadDragOffset.x + dadPreviewCharacter.offset.x; dadPreviewY = mousePoint.y + dadDragOffset.y + dadPreviewCharacter.offset.y; }
-		if (gfPreviewDragging && gfDragOffset != null && gfPreviewCharacter != null) { gfPreviewX = mousePoint.x + gfDragOffset.x + gfPreviewCharacter.offset.x; gfPreviewY = mousePoint.y + gfDragOffset.y + gfPreviewCharacter.offset.y; }
-		if (p4PreviewDragging && p4DragOffset != null && p4PreviewCharacter != null) { p4PreviewX = mousePoint.x + p4DragOffset.x + p4PreviewCharacter.offset.x; p4PreviewY = mousePoint.y + p4DragOffset.y + p4PreviewCharacter.offset.y; }
+
+		if (FlxG.mouse.released)
+		{
+			stagePreviewDragKey = null;
+			if (stagePreviewDragOffset != null) { stagePreviewDragOffset.put(); stagePreviewDragOffset = null; }
+		}
+		else if (FlxG.mouse.pressed && stagePreviewDragKey != null && stagePreviewDragOffset != null)
+		{
+			var dragged:Character = null;
+			switch (stagePreviewDragKey)
+			{
+				case 'bf': dragged = bfPreviewCharacter;
+				case 'dad': dragged = dadPreviewCharacter;
+				case 'gf': dragged = gfPreviewCharacter;
+				case 'p4': dragged = p4PreviewCharacter;
+				default: dragged = stagePreviewCharacters.get(stagePreviewDragKey);
+			}
+			if (dragged != null)
+			{
+				dragged.x = mousePoint.x + stagePreviewDragOffset.x;
+				dragged.y = mousePoint.y + stagePreviewDragOffset.y;
+				switch (stagePreviewDragKey)
+				{
+					case 'bf': bfPreviewX = dragged.x; bfPreviewY = dragged.y;
+					case 'dad': dadPreviewX = dragged.x; dadPreviewY = dragged.y;
+					case 'gf': gfPreviewX = dragged.x; gfPreviewY = dragged.y;
+					case 'p4': p4PreviewX = dragged.x; p4PreviewY = dragged.y;
+					default:
+						stagePreviewX.set(stagePreviewDragKey, dragged.x);
+						stagePreviewY.set(stagePreviewDragKey, dragged.y);
+				}
+			}
+		}
 		mousePoint.put();
 	}
 
-	// Test against the visible sprite rectangle rather than FlxSprite's un-offset
-	// hitbox. Character animation offsets move the rendered pixels away from x/y.
+	/**
+	 * Hit-test the character's currently rendered frame, not the origin-based
+	 * FlxObject hitbox. Character.offset is normalized in
+	 * applyNormalizedPreviewAnimationOffset(): current animation offset minus
+	 * idle offset. Consequently idle is the stable reference and every other
+	 * animation's click area follows the same corrected position as its pixels.
+	 *
+	 * Use frame dimensions multiplied by scale instead of character.width/height:
+	 * those values describe the physics hitbox and can be stale/different from
+	 * the displayed frame after an animation or scale change.
+	 */
 	function isMouseOverCharacterSprite(character:Character, mouseX:Float, mouseY:Float):Bool
 	{
-		if (character == null || !character.exists || !character.visible) return false;
-		var left:Float = character.x - character.offset.x;
-		var top:Float = character.y - character.offset.y;
-		var right:Float = left + character.width;
-		var bottom:Float = top + character.height;
-		return mouseX >= left && mouseX <= right && mouseY >= top && mouseY <= bottom;
+		if (character == null || !character.exists || !character.visible || character.alpha <= 0) return false;
+		var scaleX:Float = character.scale != null ? Math.abs(character.scale.x) : 1;
+		var scaleY:Float = character.scale != null ? Math.abs(character.scale.y) : 1;
+		var frameWidth:Float = character.frameWidth > 0 ? character.frameWidth : character.width;
+		var frameHeight:Float = character.frameHeight > 0 ? character.frameHeight : character.height;
+		var drawLeft:Float = character.x - character.offset.x;
+		var drawTop:Float = character.y - character.offset.y;
+		var hitWidth:Float = frameWidth * scaleX;
+		var hitHeight:Float = frameHeight * scaleY;
+		return mouseX >= drawLeft && mouseX <= drawLeft + hitWidth
+			&& mouseY >= drawTop && mouseY <= drawTop + hitHeight;
 	}
 
 	function updateCharacterPreviews():Void
 	{
-		if (bfPreviewCharacter == null && dadPreviewCharacter == null && gfPreviewCharacter == null && p4PreviewCharacter == null) return;
+		if (bfPreviewCharacter == null && dadPreviewCharacter == null && gfPreviewCharacter == null && p4PreviewCharacter == null && stagePreviewOrder.length == 0) return;
 		var songTime:Float = Conductor.songPosition;
 		updateOneCharacterPreview(bfPreviewCharacter, 'bf', songTime, curBeat);
 		updateOneCharacterPreview(dadPreviewCharacter, 'dad', songTime, curBeat);
 		updateOneCharacterPreview(gfPreviewCharacter, 'gf', songTime, curBeat);
 		updateOneCharacterPreview(p4PreviewCharacter, 'p4', songTime, curBeat);
+		applyNormalizedPreviewAnimationOffset(bfPreviewCharacter);
+		applyNormalizedPreviewAnimationOffset(dadPreviewCharacter);
+		applyNormalizedPreviewAnimationOffset(gfPreviewCharacter);
+		applyNormalizedPreviewAnimationOffset(p4PreviewCharacter);
+		for (key in stagePreviewOrder)
+		{
+			var character = stagePreviewCharacters.get(key);
+			if (character != null)
+			{
+				var previousBeat:Int = stagePreviewLastBeat.exists(key) ? stagePreviewLastBeat.get(key) : -1;
+				if (curBeat != previousBeat)
+				{
+					stagePreviewLastBeat.set(key, curBeat);
+					var animName = character.animation.curAnim != null ? character.animation.curAnim.name : '';
+					if (curBeat >= 0 && curBeat % Std.int(Math.max(1, character.danceEveryNumBeats)) == 0 && (!animName.startsWith('sing') || character.isAnimationFinished()) && !character.specialAnim) character.dance();
+				}
+				applyNormalizedPreviewAnimationOffset(character);
+			}
+		}
 	}
 
-	// Preview coordinates are the user's stable placement anchor. Do not rewrite them
-	// when an animation changes Character.offset: playAnim() owns that offset, and
-	// Flixel applies it naturally while rendering. Reapplying only the anchor here
-	// prevents per-frame offset compensation from accumulating or fighting dragging.
+	/**
+	 * Preview animation offsets are normalized against the JSON idle offset, so
+	 * idle is always visually [0, 0]. Flixel treats Character.offset as a pixel
+	 * displacement, so scale the normalized value by the preview's current scale.
+	 * The JSON data and Character.positionArray are never modified here.
+	 */
+	function applyNormalizedPreviewAnimationOffset(character:Character):Void
+	{
+		if (character == null) return;
+		var animName:String = character.animation != null && character.animation.curAnim != null
+			? character.animation.curAnim.name : '';
+		if (animName.length == 0)
+		{
+			character.offset.set(0, 0);
+			return;
+		}
+
+		var idleName:String = 'idle' + character.idleSuffix;
+		var idleOffset:Array<Dynamic> = character.animOffsets != null ? character.animOffsets.get(idleName) : null;
+		if (idleOffset == null && character.danceIdle)
+			idleOffset = character.animOffsets.get('danceLeft' + character.idleSuffix);
+		var animOffset:Array<Dynamic> = character.animOffsets != null ? character.animOffsets.get(animName) : null;
+
+		var idleX:Float = idleOffset != null && idleOffset.length > 0 ? idleOffset[0] : 0;
+		var idleY:Float = idleOffset != null && idleOffset.length > 1 ? idleOffset[1] : 0;
+		var animX:Float = animOffset != null && animOffset.length > 0 ? animOffset[0] : 0;
+		var animY:Float = animOffset != null && animOffset.length > 1 ? animOffset[1] : 0;
+		var scaleX:Float = character.scale != null ? character.scale.x : 1;
+		var scaleY:Float = character.scale != null ? character.scale.y : 1;
+		// Keep the idle animation as the zero-offset baseline for both rendering
+		// and mouse hit-testing. This never mutates Character.animOffsets/JSON.
+		character.offset.set((animX - idleX) * scaleX, (animY - idleY) * scaleY);
+	}
 
 	// Trim note type text without using StringTools: this project has its own
 	// mikolka.funkin.utils.StringTools class, which does not expose trim().
@@ -4222,19 +4618,93 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		var noteType:String = note.noteType != null ? trimPreviewNoteType(note.noteType) : '';
 		var character:Character = null;
 		var slot:String = '';
+		var gfCompanion:Character = null;
+		var isGFPreviewNote:Bool = note.gfNote || customPreviewNoteMatches(gfCustomNoteInput, noteType);
+		// Explicit Stage Editor bindings route exclusively, except GF types: those are
+		// intentionally dual-routed through the GF tab's shared-note behavior.
+		if (!isGFPreviewNote) for (key in stagePreviewOrder)
+		{
+			var preview:Character = stagePreviewCharacters.get(key);
+			var data:Dynamic = stagePreviewData.get(key);
+			var assigned:Array<String> = data != null && data.noteTypes != null ? cast data.noteTypes : [];
+			var extra:PsychUIInputText = stagePreviewNoteInputs.get(key);
+			var matched:Bool = false;
+			for (assignedType in assigned) if (trimPreviewNoteType(assignedType) == noteType) matched = true;
+			if (!matched && customPreviewNoteMatches(extra, noteType)) matched = true;
+			if (matched && preview != null)
+			{
+				character = preview;
+				slot = 'stage:' + key;
+				break;
+			}
+		}
+		// GF note types are intentionally dual-routed: the stage GF and the
+		// active BF/Dad lane character can sing the same note together.
+		if (character == null && isGFPreviewNote)
+		{
+			gfCompanion = gfPreviewCharacter;
+			if (gfCompanion == null)
+			{
+				for (key in stagePreviewOrder)
+				{
+					var data:Dynamic = stagePreviewData.get(key);
+					var id:String = data != null && data.character != null ? Std.string(data.character).toLowerCase() : '';
+					if (id == 'gf' || id.startsWith('gf-') || id.startsWith('gf_')) { gfCompanion = stagePreviewCharacters.get(key); break; }
+				}
+			}
+			if (gfCompanion != null)
+			{
+				var expectedMain:String = note.mustPress ? PlayState.SONG.player1 : PlayState.SONG.player2;
+				for (key in stagePreviewOrder)
+				{
+					var data:Dynamic = stagePreviewData.get(key);
+					if (data != null && data.character == expectedMain)
+					{
+						character = stagePreviewCharacters.get(key);
+						 slot = 'stage:' + key;
+						break;
+					}
+				}
+			}
+		}
+		// BF-only and Dad-only custom types sing only on their assigned default character.
+		// These explicit tab assignments take precedence over ordinary lane fallback.
+		if (character == null && customPreviewNoteMatches(bfCustomNoteInput, noteType)) { character = bfPreviewCharacter; slot = 'bf'; }
+		if (character == null && customPreviewNoteMatches(dadCustomNoteInput, noteType)) { character = dadPreviewCharacter; slot = 'dad'; }
+		// Ordinary notes are routed to the active stage object matching BF/Dad.
+		if (character == null)
+		{
+			var expectedCharacter:String = note.mustPress ? PlayState.SONG.player1 : PlayState.SONG.player2;
+			for (key in stagePreviewOrder)
+			{
+				var data:Dynamic = stagePreviewData.get(key);
+				if (data != null && data.character == expectedCharacter)
+				{
+					character = stagePreviewCharacters.get(key);
+					slot = 'stage:' + key;
+					break;
+				}
+			}
+		}
 		// Player 4 custom note routing takes precedence if a type is listed in both fields.
-		if (customPreviewNoteMatches(p4CustomNoteInput, noteType) && p4PreviewCharacter != null)
+		if (character == null && customPreviewNoteMatches(p4CustomNoteInput, noteType) && p4PreviewCharacter != null)
 		{ character = p4PreviewCharacter; slot = 'p4'; }
-		else if ((note.gfNote || customPreviewNoteMatches(gfCustomNoteInput, noteType)) && gfPreviewCharacter != null)
+		else if (character == null && (note.gfNote || customPreviewNoteMatches(gfCustomNoteInput, noteType)) && gfPreviewCharacter != null)
 		{ character = gfPreviewCharacter; slot = 'gf'; }
-		else if (note.mustPress)
+		else if (character == null && note.mustPress)
 		{ character = bfPreviewCharacter; slot = 'bf'; }
-		else
+		else if (character == null)
 		{ character = dadPreviewCharacter; slot = 'dad'; }
 		if (character == null) return;
 		var directions:Array<String> = ['LEFT', 'DOWN', 'UP', 'RIGHT'];
 		var direction:Int = Std.int(FlxMath.bound(note.noteData, 0, directions.length - 1));
 		character.playAnim('sing' + directions[direction], true);
+		applyNormalizedPreviewAnimationOffset(character);
+		if (gfCompanion != null)
+		{
+			gfCompanion.playAnim('sing' + directions[direction], true);
+			applyNormalizedPreviewAnimationOffset(gfCompanion);
+		}
 		var sustainMs:Float = (note.songData != null && note.songData.length > 2) ? note.songData[2] : 0;
 		character.holdTimer = -sustainMs / 1000;
 		switch (slot)
@@ -4243,6 +4713,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 			case 'dad': dadPreviewLastNote = note.strumTime; dadPreviewLastAnimTime = Conductor.songPosition;
 			case 'gf': gfPreviewLastNote = note.strumTime; gfPreviewLastAnimTime = Conductor.songPosition;
 			case 'p4': p4PreviewLastNote = note.strumTime; p4PreviewLastAnimTime = Conductor.songPosition;
+			default: stagePreviewLastAnimTime.set(slot.substr(6), Conductor.songPosition);
 		}
 	}
 
@@ -5886,6 +6357,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		if (gfPreviewCharacter != null) remove(gfPreviewCharacter, true);
 		if (p4PreviewCharacter != null) remove(p4PreviewCharacter, true);
 		if (characterScaleBox != null) remove(characterScaleBox, true);
+		for (preview in stagePreviewCharacters) if (preview != null) remove(preview, true);
 		if (bfDragOffset != null) bfDragOffset.put();
 		if (dadDragOffset != null) dadDragOffset.put();
 		if (gfDragOffset != null) gfDragOffset.put();
