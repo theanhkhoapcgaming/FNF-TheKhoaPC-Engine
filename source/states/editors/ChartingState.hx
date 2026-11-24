@@ -273,7 +273,10 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 	var timeLine:FlxSprite;
 	var infoText:FlxText;
 	var infoRightText:FlxText;
+	var songFileStatusText:FlxText;
 	var selectedNotesStatusText:FlxText;
+	// Tracks chart edits since the current chart was loaded or last saved.
+	var chartHasUnsavedChanges:Bool = false;
 
 	var autoSaveIcon:FlxSprite;
 	var outputTxt:FlxText;
@@ -800,6 +803,12 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		{
 			lastFocus = PsychUIInputText.focusOn;
 			return;
+		}
+
+		if (songFileStatusText != null)
+		{
+			var currentSongFileStatus:String = getChartFileNameForStatus();
+			if (songFileStatusText.text != currentSongFileStatus) songFileStatusText.text = currentSongFileStatus;
 		}
 
 		for (num => key in keysArray)
@@ -1866,9 +1875,12 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 			var remaining:String = (FlxG.sound.music != null)
 				? '-' + FlxStringUtil.formatTime(Math.max(0, (FlxG.sound.music.length - Conductor.songPosition) / 1000), true)
 				: '-00:00.00';
-			var rightStatus:String = '${playbackRate == 1 ? "Normal" : "${FlxMath.roundDecimal(playbackRate, 2)}x"}  |  BPM: $bpmStatus  |  ${curQuant}/16  |  $remaining';
+			var chartDifficulty:String = getChartDifficultyFromFileName();
+			var rightStatus:String = '$chartDifficulty  |  BPM: $bpmStatus  |  ${curQuant}/16  |  $remaining';
+			var songFileStatus:String = getChartFileNameForStatus();
 			if(leftStatus != infoText.text) infoText.text = leftStatus;
 			if(rightStatus != infoRightText.text) infoRightText.text = rightStatus;
+			if(songFileStatusText != null && songFileStatus != songFileStatusText.text) songFileStatusText.text = songFileStatus;
 
 			var vortexPlaying:Bool = (vortexEnabled && FlxG.sound.music != null && FlxG.sound.music.playing);
 			var canPlayHitSound:Bool = (FlxG.sound.music != null && FlxG.sound.music.playing && lastTime < Conductor.songPosition);
@@ -2222,6 +2234,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 	var cachedSectionBPMs:Array<Float>;
 	function loadChart(song:SwagSong)
 	{
+		chartHasUnsavedChanges = false;
 		PlayState.SONG = song;
 		StageData.loadDirectory(PlayState.SONG);
 		Conductor.bpm = PlayState.SONG.bpm;
@@ -3867,6 +3880,40 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		}
 		#end
 	}
+	/**
+	 * Difficulty is informational only and is inferred exclusively from the
+	 * currently opened chart filename. No difficulty switching is performed
+	 * from the status bar.
+	 */
+	function getChartDifficultyFromFileName():String
+	{
+		if (Song.chartPath == null || Song.chartPath.length == 0) return 'Normal';
+
+		var normalizedPath:String = Song.chartPath.replace('\\', '/');
+		var fileName:String = normalizedPath.substr(normalizedPath.lastIndexOf('/') + 1);
+		var stem:String = fileName.toLowerCase();
+		if (stem.endsWith('.json')) stem = stem.substr(0, stem.length - 5);
+
+		var knownDifficulties:Array<String> = ['nightmare', 'future', 'erect', 'hard', 'easy'];
+		for (difficulty in knownDifficulties)
+		{
+			var suffix:String = '-' + difficulty;
+			if (stem.endsWith(suffix))
+				return difficulty.charAt(0).toUpperCase() + difficulty.substr(1);
+		}
+		return 'Normal';
+	}
+
+	function getChartFileNameForStatus():String
+	{
+		// A brand-new chart keeps the original '(unsaved)' display.
+		if (Song.chartPath == null || Song.chartPath.length == 0) return 'Song File: (unsaved)';
+		var normalizedPath:String = Song.chartPath.replace('\\', '/');
+		var displayName:String = normalizedPath.substr(normalizedPath.lastIndexOf('/') + 1);
+		if (chartHasUnsavedChanges) displayName += ' (unsaved)';
+		return 'Song File: ' + displayName;
+	}
+
 	function createChartEditorStatusBar()
 	{
 		infoBox = new FlxSpriteGroup();
@@ -3895,6 +3942,12 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		selectedNotesStatusText.borderSize = 1;
 		selectedNotesStatusText.scrollFactor.set();
 		infoBox.add(selectedNotesStatusText);
+
+		songFileStatusText = new FlxText(FlxG.width * 0.68, barY + 5, FlxG.width * 0.30 - 12, getChartFileNameForStatus(), 14);
+		songFileStatusText.setFormat(null, 14, FlxColor.WHITE, RIGHT, OUTLINE_FAST, FlxColor.BLACK);
+		songFileStatusText.borderSize = 1;
+		songFileStatusText.scrollFactor.set();
+		infoBox.add(songFileStatusText);
 
 		infoText = new FlxText(12, barY + 39, Math.max(180, FlxG.width * 0.30), '', 14);
 		infoText.setFormat(null, 14, FlxColor.WHITE, LEFT, OUTLINE_FAST, FlxColor.BLACK);
@@ -6118,6 +6171,8 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 			StorageUtil.saveContent(chartName, chartData);
 			#elseif sys
 			File.saveContent(Song.chartPath, chartData);
+			chartHasUnsavedChanges = false;
+			if (songFileStatusText != null) songFileStatusText.text = getChartFileNameForStatus();
 			showOutput('Chart saved successfully to: ${Song.chartPath}');
 			#else
 			showOutput('Cannot override! Use "Save as" to save your chart',true);
@@ -6135,6 +6190,8 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 				{
 					var newPath:String = fileDialog.path;
 					Song.chartPath = newPath.replace('\\', '/');
+					chartHasUnsavedChanges = false;
+					if (songFileStatusText != null) songFileStatusText.text = getChartFileNameForStatus();
 					reloadNotesDropdowns();
 					showOutput('Chart saved successfully to: $newPath');
 
@@ -6455,6 +6512,12 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 	var currentUndo:Int = 0;
 	function addUndoAction(action:UndoAction, data:Dynamic)
 	{
+		if (action != SELECT_NOTE)
+		{
+			chartHasUnsavedChanges = true;
+			if (songFileStatusText != null) songFileStatusText.text = getChartFileNameForStatus();
+		}
+
 		function destroyFromArr(arr:Array<MetaNote>)
 		{
 			if(arr == null || arr.length < 1) return;
